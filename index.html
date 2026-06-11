@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hive Pulse — Scroll Experience</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/dashboard.css" />
+</head>
+<body>
+
+  <!-- ─── LOADING OVERLAY (fades out when model is 100% loaded) ─── -->
+  <div id="loader" class="loader">
+    <div class="loader-inner">
+      <svg class="loader-mark" width="46" height="46" viewBox="0 0 26 26" fill="none">
+        <path d="M13 2L24 7.5V18.5L13 24L2 18.5V7.5L13 2Z" stroke="#F5A623" stroke-width="1.2" fill="rgba(245,166,35,.05)"/>
+        <path d="M13 7L20 10.75V16.25L13 20L6 16.25V10.75L13 7Z" fill="rgba(245,166,35,.12)" stroke="#F5A623" stroke-width=".5"/>
+      </svg>
+      <div class="loader-label">HIVE PULSE</div>
+      <div class="loader-bar"><div class="loader-bar-fill" id="loaderFill"></div></div>
+      <div class="loader-pct" id="loaderPct">0%</div>
+    </div>
+  </div>
+
+  <!-- ─── FIXED FULL-SCREEN CANVAS (3D lives here, behind everything) ─── -->
+  <canvas id="webgl"></canvas>
+
+  <!-- ─── SCROLL CONTENT — transparent sections overlaid on the canvas ─── -->
+  <main id="content">
+
+    <!-- SECTION 1 -->
+    <section class="panel" data-section="1">
+      <div class="panel-text align-center">
+        <span class="kicker">Hive Financial Systems · Live</span>
+        <h1>Every team.<br><em>Every blocker.</em><br>Right now.</h1>
+        <p>An AI agent that watches GitHub &amp; Jira across five engineering teams —
+           and surfaces what matters before it costs a sprint.</p>
+        <span class="scroll-hint">Scroll to explore ↓</span>
+      </div>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section class="panel" data-section="2">
+      <div class="panel-text align-left">
+        <span class="kicker">The Hive</span>
+        <h2>Five cells.<br>One living system.</h2>
+        <p>Lending Ops, Payments, Underwriting, Analytics, and Infrastructure at the
+           core. Each cell pulses with real status — shipped work, in-flight tickets,
+           and cross-team dependencies, all in one place.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section class="panel" data-section="3">
+      <div class="panel-text align-right">
+        <span class="kicker">Blocker Radar</span>
+        <h2>It sees the stall<br>before you do.</h2>
+        <p>When an Infra ticket trends toward its 24–32h SLA, Pulse flags it,
+           routes it to the right owner, and drafts the escalation — so the
+           status meeting becomes a thing of the past.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 4 -->
+    <section class="panel" data-section="4">
+      <div class="panel-text align-center">
+        <span class="kicker">Replace the status meeting</span>
+        <h2>An agent that<br><em>never sleeps.</em></h2>
+        <p>Auto status reports. Blocker radar. ROI scoring. Executive rollups.
+           Always on, always current.</p>
+        <a href="#" class="cta">View Live Dashboard →</a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── LIVE DASHBOARD (revealed by the Section-4 CTA; bound to /api/snapshot) ─── -->
+  <section id="dashboard" class="dashboard" hidden></section>
+  <div id="pulse-ticker" class="pulse-ticker" hidden></div>
+  <div id="detail-overlay" class="detail-overlay"></div>
+  <button id="backTop" class="back-top" hidden>↑ Top</button>
+
+  <script type="module" src="/main.js"></script>
+  <script type="module" src="/dashboard.js"></script>
+</body>
+</html>

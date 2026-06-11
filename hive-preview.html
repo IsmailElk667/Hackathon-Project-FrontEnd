@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hive Pulse — Model Design Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --amber:#F5A623; --teal:#2DD4BF; --graphite:#0C0D0F; --paper:#E8EAED;
+      --silver:#8A9099; --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif;
+      --border:rgba(45,212,191,.18);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--graphite);color:var(--paper);font-family:var(--sans)}
+    #webgl{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+
+    /* top-left identity */
+    .hp-id{position:fixed;top:22px;left:24px;z-index:10;pointer-events:none}
+    .hp-id .mark{display:flex;align-items:center;gap:10px}
+    .hp-id .label{font-family:var(--mono);font-size:12px;letter-spacing:.32em;color:var(--amber)}
+    .hp-id .sub{margin-top:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--silver);max-width:260px;line-height:1.5}
+
+    /* variant name (top-right) */
+    .hp-variant{position:fixed;top:22px;right:24px;z-index:10;text-align:right;pointer-events:none}
+    .hp-variant .vname{font-family:var(--sans);font-weight:800;font-size:20px;letter-spacing:-.01em}
+    .hp-variant .vdesc{margin-top:4px;font-family:var(--mono);font-size:10.5px;color:var(--silver);max-width:300px;line-height:1.5}
+    .hp-variant .vtag{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);border:1px solid var(--border);border-radius:999px;padding:3px 9px}
+
+    /* bottom switcher */
+    .hp-switch{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:10;display:flex;gap:8px;background:rgba(12,13,15,.72);
+      border:1px solid var(--border);border-radius:14px;padding:7px;backdrop-filter:blur(8px)}
+    .hp-switch button{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--silver);background:transparent;border:1px solid transparent;
+      border-radius:9px;padding:9px 14px;cursor:pointer;transition:.18s;white-space:nowrap}
+    .hp-switch button:hover{color:var(--paper)}
+    .hp-switch button.active{color:var(--graphite);background:var(--amber);border-color:var(--amber);font-weight:600}
+
+    /* hint + autorotate toggle */
+    .hp-hint{position:fixed;left:24px;bottom:30px;z-index:10;font-family:var(--mono);font-size:10px;color:var(--silver);letter-spacing:.04em;pointer-events:none}
+    .hp-tools{position:fixed;right:24px;bottom:30px;z-index:10;display:flex;gap:8px}
+    .hp-tools button{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--silver);background:rgba(12,13,15,.72);
+      border:1px solid var(--border);border-radius:9px;padding:8px 12px;cursor:pointer;transition:.18s}
+    .hp-tools button:hover{color:var(--paper);border-color:var(--amber)}
+    .hp-tools button.on{color:var(--amber)}
+  </style>
+</head>
+<body>
+  <canvas id="webgl"></canvas>
+
+  <div class="hp-id">
+    <div class="mark">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+        <path d="M13 2L24 7.5V18.5L13 24L2 18.5V7.5L13 2Z" stroke="#F5A623" stroke-width="1.2" fill="rgba(245,166,35,.05)"/>
+        <path d="M13 7L20 10.75V16.25L13 20L6 16.25V10.75L13 7Z" fill="rgba(245,166,35,.12)" stroke="#F5A623" stroke-width=".5"/>
+      </svg>
+      <span class="label">HIVE PULSE</span>
+    </div>
+    <div class="sub">Model design preview · not yet integrated. Pick a direction and I'll wire it into the scroll scene.</div>
+  </div>
+
+  <div class="hp-variant">
+    <div class="vname" id="vName">—</div>
+    <div class="vdesc" id="vDesc">—</div>
+    <div class="vtag" id="vTag">—</div>
+  </div>
+
+  <div class="hp-switch" id="switch"></div>
+  <div class="hp-hint">drag to rotate · scroll to zoom</div>
+  <div class="hp-tools">
+    <button id="spinBtn" class="on">⟳ auto-spin: on</button>
+    <button id="resetBtn">⌖ reset view</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three'
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+    import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+    import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+    import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+    import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+    import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+
+    const COL = { amber:0xF5A623, teal:0x2DD4BF, graphite:0x0C0D0F, sub:0x131518,
+                  ember:0xEF4444, circuit:0x22C55E, blue:0x3B82F6, frame:0x171B26,
+                  gold:0x918444, goldHi:0xC2B16A, rim:0x9FB2C0 }   // gold = Hive brand
+
+    const canvas = document.getElementById('webgl')
+    const sizes = { w: window.innerWidth, h: window.innerHeight }
+
+    // ── renderer ──────────────────────────────────────────────────────────────
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true })
+    renderer.setSize(sizes.w, sizes.h)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 0.72
+
+    // ── scene + gradient backdrop ───────────────────────────────────────────────
+    const scene = new THREE.Scene()
+    ;(function bg(){
+      const c = document.createElement('canvas'); c.width = 16; c.height = 256
+      const x = c.getContext('2d')
+      const g = x.createLinearGradient(0,0,0,256)
+      g.addColorStop(0,'#16181d'); g.addColorStop(.5,'#0c0d0f'); g.addColorStop(1,'#070708')
+      x.fillStyle = g; x.fillRect(0,0,16,256)
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
+      scene.background = tex
+    })()
+
+    const CAM_DIST = 8.5
+    const camera = new THREE.PerspectiveCamera(40, sizes.w/sizes.h, 0.1, 100)
+    camera.position.set(0, 0.6, CAM_DIST)
+
+    // ── environment reflections (no external file) ───────────────────────────────
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+
+    // ── lighting (same family as the scroll scene) ───────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 0.2))
+    const key = new THREE.DirectionalLight(0xfff2dd, 1.1); key.position.set(5,6,4); scene.add(key)
+    const back = new THREE.DirectionalLight(COL.rim, 0.8); back.position.set(-4,2,-6); scene.add(back)
+    const fill = new THREE.PointLight(COL.gold, 0.5, 25, 2); fill.position.set(-4,-3,3); scene.add(fill)
+
+    // ── post-processing: bloom (the "glow" that kills the flat look) ──────────────
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    const bloom = new UnrealBloomPass(new THREE.Vector2(sizes.w, sizes.h), 0.16, 0.5, 0.96)
+    composer.addPass(bloom)
+    composer.addPass(new OutputPass())
+
+    // ── controls ──────────────────────────────────────────────────────────────
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true; controls.dampingFactor = 0.06
+    controls.autoRotate = true; controls.autoRotateSpeed = 0.9
+    controls.enablePan = false; controls.minDistance = 3.6; controls.maxDistance = 11
+
+    // ── shared helpers ──────────────────────────────────────────────────────────
+    const root = new THREE.Group(); scene.add(root)
+    let pulse = []   // [{mat, base, amp, speed, phase}]
+    let orbit = []   // [{obj, r, a, speed, yb}]
+
+    const frameMat = new THREE.MeshStandardMaterial({ color:COL.frame, metalness:0.8, roughness:0.45, envMapIntensity:0.5 })
+    const edgeMat  = new THREE.LineBasicMaterial({ color:COL.teal, transparent:true, opacity:0.16 })
+
+    function glowMat(color, baseI=1.0){
+      return new THREE.MeshStandardMaterial({ color, emissive:color, emissiveIntensity:baseI, metalness:0.15, roughness:0.55, envMapIntensity:0.4 })
+    }
+    function hexGeo(R, depth){
+      const s = new THREE.Shape()
+      for (let i=0;i<6;i++){ const a=Math.PI/3*i, x=R*Math.cos(a), y=R*Math.sin(a); i ? s.lineTo(x,y) : s.moveTo(x,y) }
+      s.closePath()
+      const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled:true, bevelThickness:depth*0.22, bevelSize:R*0.10, bevelSegments:4, curveSegments:6 })
+      g.center(); return g
+    }
+    const axial = (q,r,R) => [ R*1.5*q, R*Math.sqrt(3)*(r + q/2) ]
+    const hexDist = (q,r) => (Math.abs(q)+Math.abs(r)+Math.abs(q+r))/2
+
+    function clear(obj){
+      while (obj.children.length){
+        const c = obj.children.pop()
+        c.geometry?.dispose?.()
+        if (c.material) (Array.isArray(c.material)?c.material:[c.material]).forEach(m=>m.dispose())
+        obj.remove(c)
+      }
+    }
+
+    // ── VARIANT A — Honeycomb Core ───────────────────────────────────────────────
+    // Dense 19-cell comb domed toward the camera; amber cells pulse out from the
+    // centre in a wave, two teal accents, dark metallic frame with faint edge glow.
+    function buildHoneycombCore(){
+      const g = new THREE.Group()
+      const N = 2, R = 0.46
+      const glowKeys = new Set(['0,0','1,-1','-1,1','2,-1','-2,1','0,2','0,-2','1,1','-1,-1'])
+      const hiKeys = new Set(['0,0','2,-1','-2,1'])   // a few brighter gold accents
+      for (let q=-N;q<=N;q++) for (let r=-N;r<=N;r++){
+        const d = hexDist(q,r); if (d>N) continue
+        const [x,y] = axial(q,r,R)
+        const depth = 0.52 - d*0.10
+        const geo = hexGeo(R*0.93, depth)
+        const key = q+','+r
+        if (glowKeys.has(key)){
+          const c = hiKeys.has(key) ? COL.goldHi : COL.gold
+          const m = glowMat(c, 0.22)
+          const mesh = new THREE.Mesh(geo, m)
+          mesh.position.set(x, y, -d*0.05 + (0.52-depth)/2 + 0.04)
+          g.add(mesh)
+          pulse.push({ mat:m, base:0.16, amp:0.12, speed:1.6, phase:d*1.05 })
+        } else {
+          const mesh = new THREE.Mesh(geo, frameMat)
+          mesh.position.set(x, y, -d*0.06)
+          g.add(mesh)
+          const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat)
+          e.position.copy(mesh.position); g.add(e)
+        }
+      }
+      g.scale.setScalar(0.92); g.rotation.x = -0.14
+      return g
+    }
+
+    // ── VARIANT B — Pulse Crystal ────────────────────────────────────────────────
+    // A faceted dark-glass gem with a molten amber core glowing through it, three
+    // glowing hex chips orbiting. Sleek / abstract "energy core".
+    function buildPulseCrystal(){
+      const g = new THREE.Group()
+      const shellGeo = new THREE.IcosahedronGeometry(1.5, 0)
+      const shell = new THREE.Mesh(shellGeo, new THREE.MeshPhysicalMaterial({
+        color:0x0b0e14, metalness:0, roughness:0.05, transmission:0.92, thickness:1.4,
+        ior:1.6, clearcoat:1, clearcoatRoughness:0.12, envMapIntensity:1.5, transparent:true
+      }))
+      g.add(shell)
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(shellGeo),
+        new THREE.LineBasicMaterial({ color:COL.teal, transparent:true, opacity:0.30 }))
+      g.add(edges)
+      const coreMat = glowMat(COL.amber, 1.25)
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 0), coreMat))
+      pulse.push({ mat:coreMat, base:1.15, amp:0.7, speed:1.8, phase:0 })
+      for (let i=0;i<3;i++){
+        const c = i===1 ? COL.teal : COL.amber
+        const m = glowMat(c, 0.85)
+        const chip = new THREE.Mesh(hexGeo(0.19, 0.07), m)
+        const a = i/3 * Math.PI*2, yb = Math.sin(a*1.3)*0.55
+        chip.position.set(Math.cos(a)*1.95, yb, Math.sin(a)*1.95)
+        g.add(chip)
+        pulse.push({ mat:m, base:0.8, amp:0.5, speed:2.2, phase:i*2 })
+        orbit.push({ obj:chip, r:1.95, a, speed:0.45+i*0.08, yb })
+      }
+      return g
+    }
+
+    // ── VARIANT C — Hive Sphere ──────────────────────────────────────────────────
+    // Hex cells tiled over a sphere (Fibonacci distribution) — "five cells, one
+    // living system". A handful glow in the five team colours and pulse.
+    function buildHiveSphere(){
+      const g = new THREE.Group()
+      const N = 150, R = 1.55, gold = Math.PI*(3-Math.sqrt(5))
+      const hg = hexGeo(0.155, 0.05)
+      const teamCols = [COL.amber,COL.circuit,COL.ember,COL.teal,COL.blue,
+                        COL.amber,COL.amber,COL.teal,COL.circuit,COL.amber,COL.ember,COL.amber,COL.teal,COL.amber]
+      let gi = 0
+      for (let i=0;i<N;i++){
+        const y = 1 - (i/(N-1))*2
+        const rad = Math.sqrt(Math.max(0,1-y*y))
+        const th = gold*i
+        const dir = new THREE.Vector3(Math.cos(th)*rad, y, Math.sin(th)*rad)
+        const glow = (i % 11 === 0) && gi < teamCols.length
+        let mesh
+        if (glow){
+          const m = glowMat(teamCols[gi], 0.8)
+          mesh = new THREE.Mesh(hg, m)
+          pulse.push({ mat:m, base:0.7, amp:0.55, speed:1.4 + (gi%3)*0.35, phase:gi*1.3 })
+          gi++
+        } else {
+          mesh = new THREE.Mesh(hg, frameMat)
+        }
+        mesh.position.copy(dir.clone().multiplyScalar(R))
+        mesh.lookAt(0,0,0) // +z cap faces outward
+        g.add(mesh)
+      }
+      const atmo = new THREE.Mesh(new THREE.SphereGeometry(R*0.92, 32, 32),
+        new THREE.MeshStandardMaterial({ color:COL.amber, emissive:COL.amber, emissiveIntensity:0.10, transparent:true, opacity:0.05, side:THREE.BackSide }))
+      g.add(atmo)
+      g.rotation.x = -0.18
+      return g
+    }
+
+    // ── variant registry + switching ─────────────────────────────────────────────
+    const VARIANTS = [
+      { id:'core',    name:'Honeycomb Core', tag:'recommended',
+        desc:'Domed comb of cells that pulse outward from the centre. Keeps the hive identity — a polished version of what you have now.',
+        build:buildHoneycombCore },
+      { id:'crystal', name:'Pulse Crystal',  tag:'sleek / abstract',
+        desc:'A faceted glass gem with a molten core glowing through it and hex chips in orbit. Most "premium product" feel.',
+        build:buildPulseCrystal },
+      { id:'sphere',  name:'Hive Sphere',    tag:'systems / planet',
+        desc:'Hex cells tiled over a sphere — "five cells, one living system." A few glow in the team colours.',
+        build:buildHiveSphere },
+    ]
+
+    function setVariant(id){
+      clear(root); pulse = []; orbit = []
+      const v = VARIANTS.find(x=>x.id===id) || VARIANTS[0]
+      root.add(v.build())
+      document.getElementById('vName').textContent = v.name
+      document.getElementById('vDesc').textContent = v.desc
+      document.getElementById('vTag').textContent  = v.tag
+      ;[...document.querySelectorAll('#switch button')].forEach(b=>b.classList.toggle('active', b.dataset.id===v.id))
+    }
+
+    // build switcher buttons
+    const sw = document.getElementById('switch')
+    VARIANTS.forEach(v=>{
+      const b = document.createElement('button'); b.textContent = v.name; b.dataset.id = v.id
+      b.addEventListener('click', ()=>setVariant(v.id)); sw.appendChild(b)
+    })
+
+    // tools
+    const spinBtn = document.getElementById('spinBtn')
+    spinBtn.addEventListener('click', ()=>{
+      controls.autoRotate = !controls.autoRotate
+      spinBtn.classList.toggle('on', controls.autoRotate)
+      spinBtn.textContent = '⟳ auto-spin: ' + (controls.autoRotate ? 'on' : 'off')
+    })
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      camera.position.set(0,0.6,CAM_DIST); controls.target.set(0,0,0); controls.update()
+    })
+
+    // ── resize ──────────────────────────────────────────────────────────────────
+    window.addEventListener('resize', ()=>{
+      sizes.w = window.innerWidth; sizes.h = window.innerHeight
+      camera.aspect = sizes.w/sizes.h; camera.updateProjectionMatrix()
+      renderer.setSize(sizes.w, sizes.h); composer.setSize(sizes.w, sizes.h)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    })
+
+    // ── render loop ───────────────────────────────────────────────────────────────
+    const clock = new THREE.Clock()
+    let paused = false
+    function animate(){
+      requestAnimationFrame(animate)
+      if (paused) return                 // freeze on last frame (lets headless capture settle)
+      const t = clock.getElapsedTime()
+      for (const p of pulse) p.mat.emissiveIntensity = p.base + p.amp*0.5*(1+Math.sin(t*p.speed + p.phase))
+      for (const o of orbit){ const a = o.a + t*o.speed; o.obj.position.set(Math.cos(a)*o.r, o.yb, Math.sin(a)*o.r); o.obj.rotation.y += 0.02 }
+      controls.update()
+      composer.render()
+    }
+
+    setVariant('core')
+    animate()
+
+    // expose for screenshot tooling
+    window.__setVariant = setVariant
+    window.__spin = (on)=>{ controls.autoRotate = on }
+    // Freeze for a clean still: render exactly one frame at a fixed time/angle, then stop.
+    window.__pause = (angleDeg=24, elapsed=1.2)=>{
+      paused = true
+      controls.autoRotate = false
+      // deterministic framing for the still
+      const a = angleDeg*Math.PI/180
+      camera.position.set(Math.sin(a)*CAM_DIST, 0.9, Math.cos(a)*CAM_DIST)
+      controls.target.set(0,0,0); controls.update()
+      for (const p of pulse) p.mat.emissiveIntensity = p.base + p.amp*0.5*(1+Math.sin(elapsed*p.speed + p.phase))
+      for (const o of orbit){ const oa = o.a + elapsed*o.speed; o.obj.position.set(Math.cos(oa)*o.r, o.yb, Math.sin(oa)*o.r) }
+      composer.render()
+      return 'paused'
+    }
+    window.__resume = ()=>{ paused = false; controls.autoRotate = true; return 'resumed' }
+    // Render one frame and read the GL buffer back synchronously → reliable content
+    // check that doesn't depend on the (flaky) headless screenshot tool.
+    window.__snap = ()=>{
+      composer.render()
+      const gl = renderer.getContext()
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight
+      const buf = new Uint8Array(w*h*4)
+      gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,buf)
+      let lit=0, sum=0, maxR=0,maxG=0,maxB=0, amber=0, teal=0
+      let lr=0,lg=0,lb=0, white=0     // lit-pixel colour accumulators + near-white clip count
+      const n = w*h
+      for (let i=0;i<buf.length;i+=4){
+        const r=buf[i],g=buf[i+1],b=buf[i+2]
+        sum += r+g+b
+        if (r+g+b > 140){ lit++; lr+=r; lg+=g; lb+=b }
+        if (r>240 && g>235 && b>225) white++                   // clipped to ~white
+        if (r>maxR) maxR=r; if (g>maxG) maxG=g; if (b>maxB) maxB=b
+        if (r>150 && g>90 && g<200 && b<90) amber++           // amber-ish
+        if (b>120 && g>120 && r<120) teal++                    // teal-ish
+      }
+      return { w, h, litPct:+(lit/n*100).toFixed(1), avgBright:+(sum/n).toFixed(1),
+               maxR, maxG, maxB, amberPx:amber, tealPx:teal,
+               litMean: lit? [Math.round(lr/lit),Math.round(lg/lit),Math.round(lb/lit)] : [0,0,0],
+               whitePx: white, whitePctOfLit: lit? +(white/lit*100).toFixed(1):0 }
+    }
+    // ASCII brightness map of the rendered frame — lets me "see" composition/exposure
+    // without the (broken) screenshot tool. ' '=black … '@'=white-hot.
+    window.__thumb = (cols=56, rows=22)=>{
+      composer.render()
+      const gl = renderer.getContext()
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight
+      const buf = new Uint8Array(w*h*4)
+      gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,buf)
+      const ramp = ' .:-=+*#%@'
+      let art = '\n'
+      for (let ry=0; ry<rows; ry++){
+        let line = ''
+        for (let rx=0; rx<cols; rx++){
+          const x0=Math.floor(rx/cols*w), x1=Math.floor((rx+1)/cols*w)
+          const yTop=rows-1-ry                          // flip: readPixels is bottom-up
+          const y0=Math.floor(yTop/rows*h), y1=Math.floor((yTop+1)/rows*h)
+          let s=0,c=0
+          for (let y=y0;y<y1;y+=3) for (let x=x0;x<x1;x+=3){ const i=(y*w+x)*4; s+=buf[i]+buf[i+1]+buf[i+2]; c++ }
+          const br=s/c/3
+          line += ramp[Math.min(ramp.length-1, Math.floor(br/256*ramp.length))]
+        }
+        art += line + '\n'
+      }
+      return art
+    }
+  </script>
+</body>
+</html>
