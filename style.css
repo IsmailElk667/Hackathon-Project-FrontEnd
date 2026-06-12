@@ -92,10 +92,8 @@ h2 { font-size: clamp(38px, 5.5vw, 68px); }
 
 h1 em {
   font-style: normal;
-  background: linear-gradient(135deg, var(--teal), #7EEEE4);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  -webkit-text-fill-color: var(--paper);
+  text-shadow: 0 0 32px rgba(245, 166, 35, 0.55), 0 2px 40px rgba(0,0,0,.7);
 }
 
 h2 em {
@@ -148,16 +146,16 @@ h2 em {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: .06em;
-  color: var(--teal);
+  color: var(--amber);
   text-decoration: none;
-  border: 1px solid rgba(45, 212, 191, .3);
+  border: 1px solid rgba(245, 166, 35, .3);
   border-radius: 20px;
   padding: 8px 18px;
-  transition: border-color .2s, color .2s, background .2s;
+  transition: border-color .2s, background .2s;
 }
 .skip-cta:hover {
-  background: rgba(45, 212, 191, .08);
-  border-color: rgba(45, 212, 191, .7);
+  background: rgba(245, 166, 35, .08);
+  border-color: rgba(245, 166, 35, .7);
 }
 
 /* ─── LOADING OVERLAY ─── */
