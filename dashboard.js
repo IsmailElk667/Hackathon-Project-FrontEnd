@@ -16,6 +16,7 @@ const tickerEl  = document.getElementById('pulse-ticker')
 const overlayEl = document.getElementById('detail-overlay')
 const backTopEl = document.getElementById('backTop')
 const ctaEl     = document.querySelector('.cta')
+const skipEl    = document.getElementById('skipBtn')
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let snapshot = null
@@ -345,6 +346,7 @@ async function manualRefresh() {
 function reveal() {
   if (revealed) { dashEl.scrollIntoView({ behavior: 'smooth' }); return }
   revealed = true
+  if (skipEl) skipEl.hidden = true   // hide skip button once dashboard is revealed
   dashEl.hidden = false
   dashEl.classList.add('revealing')
   tickerEl.hidden = false
@@ -357,7 +359,8 @@ function reveal() {
 }
 
 // ── Wire-up ─────────────────────────────────────────────────────────────────
-if (ctaEl) ctaEl.addEventListener('click', (e) => { e.preventDefault(); reveal() })
+if (ctaEl)  ctaEl.addEventListener('click',  (e) => { e.preventDefault(); reveal() })
+if (skipEl) skipEl.addEventListener('click', (e) => { e.preventDefault(); reveal() })
 overlayEl?.addEventListener('click', (e) => { if (e.target === overlayEl) closeDetail() })
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail() })
 backTopEl?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }))
