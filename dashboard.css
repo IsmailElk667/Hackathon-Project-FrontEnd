@@ -237,10 +237,14 @@
 .grp-body { padding: 4px 14px 12px; border-top: 1px solid var(--border); }
 .backlog-grp { margin-top: 10px; }
 
-/* ─── STAGE GROUPING (inside the team detail modal) ─── */
-.stage-group { margin-bottom: 12px; }
-.stage-head { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--silver); margin: 8px 0 6px; padding-bottom: 4px; border-bottom: 1px dashed var(--border); }
-.stage-count { color: rgba(139,143,168,.7); }
+/* ─── STAGE DROPDOWNS (collapsible, inside the team detail modal) ─── */
+.stage-grp { margin-bottom: 6px; background: rgba(255,255,255,.02); }
+.stage-grp > .grp-summary { padding: 9px 12px; font-size: 12px; }
+.stage-grp .grp-name { font-weight: 600; }
+.stage-grp > .grp-body { padding: 6px 10px 8px; }
+/* nested stage dropdowns inside the backlog dropdown — lighter, tighter */
+.backlog-grp .grp-body { padding: 8px 10px; }
+.backlog-grp .stage-grp { border-color: var(--border); }
 
 /* ─── SCORING AGENTS EASTER EGG ─── */
 .agent-egg { cursor: default; display: inline-flex; vertical-align: middle; }

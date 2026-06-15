@@ -202,8 +202,8 @@ function initiativesCard(snap) {
     const atRisk = items.filter((i) => i.status === 'at-risk').length
     const flag = blocked ? `<span class="grp-flag red">${blocked} blocked</span>` : atRisk ? `<span class="grp-flag amber">${atRisk} at risk</span>` : ''
     const rows = items.map((i) => initiativeRow(i, snap)).join('')
-    // First team open by default, the rest collapsed.
-    return `<details class="grp"${idx === 0 ? ' open' : ''}>
+    // All teams collapsed by default — click a team to expand its initiatives.
+    return `<details class="grp">
       <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">${esc(team?.name || tid)}</span><span class="grp-count">${items.length}</span>${flag}</summary>
       <div class="grp-body">${rows}</div>
     </details>`
@@ -248,10 +248,9 @@ function ticketRow(k) {
   const c = k.blocked ? ' style="color:var(--ember)"' : ''
   return `<div class="ticket-item ${cls}"><div><div class="ti-id">${esc(k.id)}</div><div class="ti-name">${esc(k.title)}</div></div><div class="ti-right"><div class="ti-stage"${c}>${esc(k.stage)}</div><div class="ti-age"${c}>${k.blocked ? 'blocked · ' : ''}${esc(k.days)}d</div></div></div>`
 }
-function inflightRows(t) {
-  const items = t.inFlightTickets || []
-  if (!items.length) return '<div class="empty-note">—</div>'
-  // Group active tickets by stage, blocked-heavy stages first.
+// Build a collapsible <details> dropdown per stage from a list of tickets.
+// openBlocked: auto-expand stages that contain a blocked ticket.
+function stageDropdowns(items, { openBlocked = false } = {}) {
   const byStage = new Map()
   for (const k of items) {
     if (!byStage.has(k.stage)) byStage.set(k.stage, [])
@@ -261,29 +260,24 @@ function inflightRows(t) {
   return stages.map((stage) => {
     const rows = byStage.get(stage)
     const blk = rows.filter((r) => r.blocked).length
-    return `<div class="stage-group">
-      <div class="stage-head"><span>${esc(stage)}</span><span class="stage-count">${rows.length}${blk ? ` · <span style="color:var(--ember)">${blk} blocked</span>` : ''}</span></div>
-      ${rows.map(ticketRow).join('')}
-    </div>`
+    const open = openBlocked && blk > 0
+    return `<details class="grp stage-grp"${open ? ' open' : ''}>
+      <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">${esc(stage)}</span><span class="grp-count">${rows.length}</span>${blk ? `<span class="grp-flag red">${blk} blocked</span>` : ''}</summary>
+      <div class="grp-body">${rows.map(ticketRow).join('')}</div>
+    </details>`
   }).join('')
+}
+function inflightRows(t) {
+  const items = t.inFlightTickets || []
+  if (!items.length) return '<div class="empty-note">—</div>'
+  return stageDropdowns(items, { openBlocked: true })  // surface blocked stages open
 }
 function backlogSection(t) {
   const items = t.backlogTickets || []
   if (!items.length) return ''
-  // Group backlog by stage too, inside one collapsed dropdown.
-  const byStage = new Map()
-  for (const k of items) {
-    if (!byStage.has(k.stage)) byStage.set(k.stage, [])
-    byStage.get(k.stage).push(k)
-  }
-  const stages = [...byStage.keys()].sort((a, b) => byStage.get(b).length - byStage.get(a).length)
-  const body = stages.map((stage) => `<div class="stage-group">
-      <div class="stage-head"><span>${esc(stage)}</span><span class="stage-count">${byStage.get(stage).length}</span></div>
-      ${byStage.get(stage).map(ticketRow).join('')}
-    </div>`).join('')
   return `<details class="grp backlog-grp">
     <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">📥 Backlog</span><span class="grp-count">${items.length}</span><span class="grp-hint">not started — click to expand</span></summary>
-    <div class="grp-body">${body}</div>
+    <div class="grp-body">${stageDropdowns(items)}</div>
   </details>`
 }
 function whyBox(t) {
