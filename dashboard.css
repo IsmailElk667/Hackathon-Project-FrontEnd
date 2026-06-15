@@ -220,6 +220,24 @@
 .init-status.at-risk { color: var(--amber); }
 .init-status.blocked { color: var(--ember); }
 
+/* ─── QUEUE DEPTH (team card mini-row) ─── */
+.tc-queue { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.tq-item { font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 4px; background: var(--graphite); color: var(--silver); border: 1px solid var(--border); white-space: nowrap; }
+.tq-item.tq-hot { color: var(--amber); border-color: rgba(245,166,35,.35); background: rgba(245,166,35,.07); font-weight: 700; }
+
+/* ─── CYCLE TIME CARD ─── */
+.ct-row { display: flex; align-items: flex-start; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ct-row:last-child { border-bottom: none; }
+.ct-name { font-family: var(--mono); font-size: 11px; font-weight: 700; width: 46px; flex-shrink: 0; padding-top: 3px; }
+.ct-stages { flex: 1; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.ct-stage-wrap { display: flex; align-items: center; gap: 6px; }
+.ct-slbl { font-size: 9px; color: var(--silver); white-space: nowrap; width: 90px; flex-shrink: 0; }
+.ct-track { width: 60px; height: 4px; background: var(--graphite); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.ct-bar { height: 100%; border-radius: 2px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+.ct-hrs { font-family: var(--mono); font-size: 9px; color: var(--silver); white-space: nowrap; min-width: 28px; }
+.ct-p90 { text-align: right; flex-shrink: 0; font-family: var(--mono); font-size: 14px; font-weight: 800; width: 44px; line-height: 1.2; }
+.ct-p90lbl { font-size: 8px; color: var(--silver); font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
+
 /* ─── DIVIDER ─── */
 .section-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 

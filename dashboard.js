@@ -89,6 +89,17 @@ function metricsRow(snap) {
   </div>`
 }
 
+function queueDepthRow(t) {
+  const q = t.queueDepth
+  if (!q || q.total === 0) return ''
+  const items = []
+  if (q.codeReview)    items.push([q.codeReview, 'in review',  q.hottest === 'codeReview'])
+  if (q.qaDone)        items.push([q.qaDone,      'QA done',    q.hottest === 'qaDone'])
+  if (q.readyToDeploy) items.push([q.readyToDeploy, 'ready',   q.hottest === 'readyToDeploy'])
+  return `<div class="tc-queue">${items.map(([n, l, hot]) =>
+    `<span class="tq-item${hot ? ' tq-hot' : ''}">${n} ${l}</span>`).join('')}</div>`
+}
+
 function teamCard(t, snap) {
   const pill = healthPill(t)
   const color = healthColorVar(t)
@@ -122,6 +133,7 @@ function teamCard(t, snap) {
     <div class="tc-stats">
       ${stats.map(([v, l, c]) => `<div class="tc-stat"><div class="tc-val"${c ? ` style="color:${c}"` : ''}>${esc(v)}</div><div class="tc-lbl">${esc(l)}</div></div>`).join('')}
     </div>
+    ${queueDepthRow(t)}
   </div>`
 }
 
@@ -169,6 +181,44 @@ function roiCard(snap) {
   return `<div class="card"><div class="card-title">📊 Effort vs. Output — Sprint ${esc(snap.sprint.number)}</div><div class="card-hint">Tickets shipped ÷ dev capacity consumed · effort-scoring agent</div>${rows}</div>`
 }
 
+function cycleTimeCard(snap) {
+  const SHOW = new Set(['In Dev', 'Code Review', 'In QA', 'QA Done', 'Ready to Deploy'])
+  const allHours = snap.teams.flatMap(t => (t.cycleTime?.byStage || [])
+    .filter(s => SHOW.has(s.stage)).map(s => s.avgHours))
+  const maxH = Math.max(...allHours, 1)
+
+  const rows = snap.teams.map(t => {
+    const ct = t.cycleTime
+    const color = healthColorVar(t)
+    const stages = (ct?.byStage || []).filter(s => SHOW.has(s.stage))
+    if (!stages.length) return `<div class="ct-row"><div class="ct-name" style="color:${color}">${esc(t.shortName)}</div><div class="ct-stages"><span style="font-size:11px;color:var(--silver)">No stage data</span></div><div class="ct-p90">—</div></div>`
+
+    const stageHtml = stages.map(s => {
+      const hot = ct.bottleneck?.stage === s.stage
+      const w = Math.max(4, Math.round((s.avgHours / maxH) * 100))
+      const c = hot ? 'var(--amber)' : 'rgba(45,212,191,.35)'
+      return `<div class="ct-stage-wrap">
+        <div class="ct-slbl"${hot ? ' style="color:var(--amber)"' : ''}>${esc(s.stage)}${hot ? ' ⚑' : ''}</div>
+        <div class="ct-track"><div class="ct-bar" style="width:${w}%;background:${c}"></div></div>
+        <div class="ct-hrs"${hot ? ' style="color:var(--amber)"' : ''}>${s.avgHours}h</div>
+      </div>`
+    }).join('')
+
+    const p90c = ct.p90AgeDays >= 7 ? 'var(--ember)' : ct.p90AgeDays >= 5 ? 'var(--amber)' : 'var(--silver)'
+    return `<div class="ct-row">
+      <div class="ct-name" style="color:${color}">${esc(t.shortName)}</div>
+      <div class="ct-stages">${stageHtml}</div>
+      <div class="ct-p90" style="color:${p90c}">${ct.p90AgeDays}d<div class="ct-p90lbl">P90</div></div>
+    </div>`
+  }).join('')
+
+  return `<div class="card" style="margin-bottom:22px">
+    <div class="card-title">⏱ Cycle Time by Stage<span class="ct-aside">avg hours · ⚑ = bottleneck · P90 ticket age</span></div>
+    <div class="card-hint">Where tickets spend the most time. Compare teams — high P90 signals a zombie ticket hiding behind the average.</div>
+    ${rows}
+  </div>`
+}
+
 function initiativesCard(snap) {
   const rows = snap.initiatives.map((i) => {
     const color = i.status === 'on-track' ? 'var(--circuit)' : i.status === 'at-risk' ? 'var(--amber)' : 'var(--ember)'
@@ -184,10 +234,12 @@ function initiativesCard(snap) {
 
 function agentsCard() {
   const rows = [
-    ['Health agent', 'health.js', '100 − 15·breaches − 6·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥2 breaches → blocked'],
+    ['Health agent', 'health.js', '100 − 15·breaches − (3/6/9)·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥2 breaches → blocked'],
     ['SLA agent', 'sla.js', 'age vs 24–32h window', '≥32h breach · 24–32h warning · ≥18h approaching'],
     ['Effort agent', 'effort.js', 'shipped ÷ (shipped + 0.5·inFlight + 0.75·stalled)', '≥0.8 Strong · ≥0.6 Good · ≥0.4 Blocked · else Critical'],
     ['Initiative agent', 'deriveInitiatives.js', 'done ÷ total children vs expected pace', 'blocked if any child blocked · at-risk if behind pace'],
+    ['Queue depth', 'queueDepth.js', 'tickets at Code Review · QA Done · Ready to Deploy', 'high count = review bottleneck or deploy-queue jam'],
+    ['Cycle time', 'cycleTime.js', 'avg hours per stage (stageHistory) + P90 ticket age', 'bottleneck = stage with highest avg · P90 catches zombie tickets'],
   ]
   return `<div class="card">
     <div class="card-title">🤖 Scoring Agents — deterministic, explainable<span class="ct-aside">no LLM in the score</span></div>
@@ -219,6 +271,7 @@ function whyBox(t) {
     <div class="why-row"><span class="wr-k">Base</span><span class="wr-v base">100</span></div>
     ${row(`SLA breaches (${b.breaches ?? 0})`, b.sla ?? 0, 'minus')}
     ${row(`Active blockers (${b.blockerCount ?? 0})`, b.blockers ?? 0, 'minus')}
+    ${(() => { const s = b.blockersByState || {}; const parts = [s.warning && `${s.warning} warning (−9)`, s.approaching && `${s.approaching} approaching (−6)`, s.ok && `${s.ok} ok (−3)`].filter(Boolean); return parts.length ? `<div class="why-row" style="padding-left:10px"><span class="wr-k" style="font-size:10px">↳ by age</span><span class="wr-v" style="font-size:10px;color:var(--silver);font-weight:400">${parts.join(' · ')}</span></div>` : '' })()}
     ${row(`Stalled ratio (${b.stalledRatio ?? 0})`, b.stalled ?? 0, 'minus')}
     ${row(`WIP age (${b.avgInFlightDays ?? 0}d avg)`, b.wip ?? 0, 'minus')}
     ${row(`Velocity (Δ ${b.velocityDelta ?? 0})`, b.velocity ?? 0, (b.velocity ?? 0) >= 0 ? 'plus' : 'minus')}
@@ -293,6 +346,7 @@ function render(snap) {
     + `<div class="exec-grid">${snap.teams.map((t) => teamCard(t, snap)).join('')}</div>`
     + `<div class="two-col">${blockersCard(snap)}${ceremoniesCard(snap)}</div>`
     + `<div class="two-col">${lifecycleCard(snap)}${roiCard(snap)}</div>`
+    + cycleTimeCard(snap)
     + `<div class="two-col">${initiativesCard(snap)}${agentsCard()}</div>`
     + `</div>`
   dashEl.dataset.rendered = '1'
