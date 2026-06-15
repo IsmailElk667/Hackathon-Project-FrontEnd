@@ -220,6 +220,39 @@
 .init-status.at-risk { color: var(--amber); }
 .init-status.blocked { color: var(--ember); }
 
+/* ─── COLLAPSIBLE GROUPS (initiatives by team · backlog dropdown) ─── */
+.grp { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: rgba(255,255,255,.012); overflow: hidden; }
+.grp[open] { border-color: var(--border2); }
+.grp-summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 11px 14px; font-size: 13px; user-select: none; transition: background .15s; }
+.grp-summary::-webkit-details-marker { display: none; }
+.grp-summary:hover { background: rgba(245,166,35,.05); }
+.grp-chevron { font-size: 11px; color: var(--amber); transition: transform .2s; display: inline-block; }
+.grp[open] > .grp-summary .grp-chevron { transform: rotate(90deg); }
+.grp-name { font-weight: 700; color: var(--paper); }
+.grp-count { font-family: var(--mono); font-size: 10px; color: var(--silver); background: var(--graphite); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; }
+.grp-flag { font-family: var(--mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
+.grp-flag.red { color: var(--ember); background: rgba(239,68,68,.1); }
+.grp-flag.amber { color: var(--amber); background: rgba(245,166,35,.1); }
+.grp-hint { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: rgba(139,143,168,.6); }
+.grp-body { padding: 4px 14px 12px; border-top: 1px solid var(--border); }
+.backlog-grp { margin-top: 10px; }
+
+/* ─── STAGE GROUPING (inside the team detail modal) ─── */
+.stage-group { margin-bottom: 12px; }
+.stage-head { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--silver); margin: 8px 0 6px; padding-bottom: 4px; border-bottom: 1px dashed var(--border); }
+.stage-count { color: rgba(139,143,168,.7); }
+
+/* ─── SCORING AGENTS EASTER EGG ─── */
+.agent-egg { cursor: default; display: inline-flex; vertical-align: middle; }
+.agent-egg:hover svg { filter: drop-shadow(0 0 6px rgba(245,166,35,.5)); }
+.agent-formula { background: var(--graphite); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; margin-bottom: 9px; }
+.af-head { display: flex; justify-content: space-between; align-items: baseline; }
+.af-name { font-weight: 700; color: var(--paper); font-size: 13px; }
+.af-file { font-size: 10px; color: var(--silver); }
+.af-eq { font-size: 11px; color: var(--amber); margin: 5px 0; }
+.af-th { font-size: 11px; color: var(--silver); }
+.agent-foot { font-size: 11px; color: var(--silver); text-align: center; margin-top: 14px; font-style: italic; }
+
 /* ─── DIVIDER ─── */
 .section-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 

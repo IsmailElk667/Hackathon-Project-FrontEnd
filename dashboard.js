@@ -59,7 +59,7 @@ function header(snap) {
   return `
   <div class="dash-header">
     <div>
-      <div class="dash-title">${hexMark()} Hive Pulse — Live Status Dashboard</div>
+      <div class="dash-title"><span id="agentEgg" class="agent-egg" title="">${hexMark()}</span> Hive Pulse — Live Status Dashboard</div>
       <div class="dash-sub" id="dashSub">Sprint ${esc(snap.sprint.number)} · Week of ${esc(snap.sprint.week)} · Updated ${esc(timeAgo(snap.generatedAt))}</div>
     </div>
     <div class="dash-meta">
@@ -169,47 +169,122 @@ function roiCard(snap) {
   return `<div class="card"><div class="card-title">📊 Effort vs. Output — Sprint ${esc(snap.sprint.number)}</div><div class="card-hint">Tickets shipped ÷ dev capacity consumed · effort-scoring agent</div>${rows}</div>`
 }
 
-function initiativesCard(snap) {
-  const rows = snap.initiatives.map((i) => {
-    const color = i.status === 'on-track' ? 'var(--circuit)' : i.status === 'at-risk' ? 'var(--amber)' : 'var(--ember)'
-    const team = snap.teams.find((t) => t.id === i.teamId)
-    return `<div class="init-row">
-      <div class="init-head"><div><span class="init-name">${esc(i.name)}</span> <span class="init-team">${esc(team?.shortName || i.teamId)}</span></div><span class="init-pct" style="color:${color}">${esc(i.progressPct)}%</span></div>
-      <div class="init-bar-wrap"><div class="init-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div><div class="roi-expected" style="left:${pct(i.expectedPct)}%" title="expected ${esc(i.expectedPct)}%"></div></div>
-      <div class="init-meta"><span>${esc(i.doneChildren)}/${esc(i.totalChildren)} done${i.blockedChildren ? ` · ${esc(i.blockedChildren)} blocked` : ''}</span><span class="init-status ${esc(i.status)}">${esc(String(i.status).replace('-', ' '))} · expected ${esc(i.expectedPct)}%</span></div>
-    </div>`
-  }).join('') || `<div class="empty-note">No initiatives tracked.</div>`
-  return `<div class="card"><div class="card-title">🎯 Initiatives & Epics — Progress<span class="ct-aside">marker = expected pace</span></div>${rows}</div>`
+function initiativeRow(i, snap) {
+  const color = i.status === 'on-track' ? 'var(--circuit)' : i.status === 'at-risk' ? 'var(--amber)' : 'var(--ember)'
+  const team = snap.teams.find((t) => t.id === i.teamId)
+  return `<div class="init-row">
+    <div class="init-head"><div><span class="init-name">${esc(i.name)}</span> <span class="init-team">${esc(team?.shortName || i.teamId)}</span></div><span class="init-pct" style="color:${color}">${esc(i.progressPct)}%</span></div>
+    <div class="init-bar-wrap"><div class="init-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
+    <div class="init-meta"><span>${esc(i.doneChildren)}/${esc(i.totalChildren)} done${i.blockedChildren ? ` · ${esc(i.blockedChildren)} blocked` : ''}</span><span class="init-status ${esc(i.status)}">${esc(String(i.status).replace('-', ' '))}</span></div>
+  </div>`
 }
 
-function agentsCard() {
+function initiativesCard(snap) {
+  if (!snap.initiatives.length) {
+    return `<div class="card"><div class="card-title">🎯 Initiatives & Epics — Progress</div><div class="empty-note">No initiatives tracked.</div></div>`
+  }
+  // Group initiatives per team, ordered to match the team list.
+  const order = snap.teams.map((t) => t.id)
+  const byTeam = new Map()
+  for (const i of snap.initiatives) {
+    if (!byTeam.has(i.teamId)) byTeam.set(i.teamId, [])
+    byTeam.get(i.teamId).push(i)
+  }
+  const teamIds = [...byTeam.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+
+  const rank = { blocked: 0, 'at-risk': 1, 'on-track': 2 }
+  const groups = teamIds.map((tid, idx) => {
+    const team = snap.teams.find((t) => t.id === tid)
+    // Blocked first, then at-risk, then by most progress — surface what needs attention.
+    const items = byTeam.get(tid).sort((a, b) =>
+      (rank[a.status] - rank[b.status]) || (b.progressPct - a.progressPct))
+    const blocked = items.filter((i) => i.status === 'blocked').length
+    const atRisk = items.filter((i) => i.status === 'at-risk').length
+    const flag = blocked ? `<span class="grp-flag red">${blocked} blocked</span>` : atRisk ? `<span class="grp-flag amber">${atRisk} at risk</span>` : ''
+    const rows = items.map((i) => initiativeRow(i, snap)).join('')
+    // First team open by default, the rest collapsed.
+    return `<details class="grp"${idx === 0 ? ' open' : ''}>
+      <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">${esc(team?.name || tid)}</span><span class="grp-count">${items.length}</span>${flag}</summary>
+      <div class="grp-body">${rows}</div>
+    </details>`
+  }).join('')
+
+  return `<div class="card"><div class="card-title">🎯 Initiatives &amp; Epics — by team<span class="ct-aside">${snap.initiatives.length} active epics</span></div>${groups}</div>`
+}
+
+// Hidden easter egg — revealed only by clicking the hex logo in the header.
+function agentsPanel() {
   const rows = [
-    ['Health agent', 'health.js', '100 − 15·breaches − 6·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥2 breaches → blocked'],
+    ['Health agent', 'health.js', '100 − 15·breaches − 6·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥1 breach → blocked'],
     ['SLA agent', 'sla.js', 'age vs 24–32h window', '≥32h breach · 24–32h warning · ≥18h approaching'],
     ['Effort agent', 'effort.js', 'shipped ÷ (shipped + 0.5·inFlight + 0.75·stalled)', '≥0.8 Strong · ≥0.6 Good · ≥0.4 Blocked · else Critical'],
     ['Initiative agent', 'deriveInitiatives.js', 'done ÷ total children vs expected pace', 'blocked if any child blocked · at-risk if behind pace'],
   ]
-  return `<div class="card">
-    <div class="card-title">🤖 Scoring Agents — deterministic, explainable<span class="ct-aside">no LLM in the score</span></div>
-    <div class="card-hint">Every health number is computed from these formulas. Click a team card to see its exact breakdown.</div>
-    ${rows.map(([n, f, eq, th]) => `<div class="roi-row" style="display:block;padding:9px 0">
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:700;color:var(--paper);font-size:12.5px">${esc(n)}</span><span class="t-mono" style="font-size:10px;color:var(--silver)">${esc(f)}</span></div>
-      <div class="t-mono" style="font-size:10.5px;color:var(--amber);margin:3px 0">${esc(eq)}</div>
-      <div style="font-size:10.5px;color:var(--silver)">${esc(th)}</div>
+  return `<div class="detail-panel">
+    <div class="detail-top">
+      <div><div class="detail-title">🤖 Scoring Agents — deterministic & explainable</div><div class="detail-sub">No LLM in the score · every health number is pure math · you found the easter egg 🥚</div></div>
+      <button class="close-btn">✕ Close</button>
+    </div>
+    ${rows.map(([n, f, eq, th]) => `<div class="agent-formula">
+      <div class="af-head"><span class="af-name">${esc(n)}</span><span class="t-mono af-file">${esc(f)}</span></div>
+      <div class="t-mono af-eq">${esc(eq)}</div>
+      <div class="af-th">${esc(th)}</div>
     </div>`).join('')}
+    <div class="agent-foot">Click any team card to see its exact score breakdown applied to live numbers.</div>
   </div>`
+}
+function openAgents() {
+  overlayEl.innerHTML = agentsPanel()
+  overlayEl.classList.add('open')
+  overlayEl.querySelector('.close-btn')?.addEventListener('click', closeDetail)
 }
 
 // ── Team detail modal ───────────────────────────────────────────────────────
 function shippedRows(t) {
   return (t.shippedTickets || []).map((k) => `<div class="ticket-item ti-green"><div><div class="ti-id">${esc(k.id)}</div><div class="ti-name">${esc(k.title)}</div></div><div class="ti-right"><div class="ti-stage">Done</div><div class="ti-age">${esc(k.day)}</div></div></div>`).join('') || '<div class="empty-note">—</div>'
 }
+function ticketRow(k) {
+  const cls = k.blocked ? 'ti-red' : (k.days >= 5 ? 'ti-amber' : 'ti-blue')
+  const c = k.blocked ? ' style="color:var(--ember)"' : ''
+  return `<div class="ticket-item ${cls}"><div><div class="ti-id">${esc(k.id)}</div><div class="ti-name">${esc(k.title)}</div></div><div class="ti-right"><div class="ti-stage"${c}>${esc(k.stage)}</div><div class="ti-age"${c}>${k.blocked ? 'blocked · ' : ''}${esc(k.days)}d</div></div></div>`
+}
 function inflightRows(t) {
-  return (t.inFlightTickets || []).map((k) => {
-    const cls = k.blocked ? 'ti-red' : (k.days >= 5 ? 'ti-amber' : 'ti-blue')
-    const c = k.blocked ? ' style="color:var(--ember)"' : ''
-    return `<div class="ticket-item ${cls}"><div><div class="ti-id">${esc(k.id)}</div><div class="ti-name">${esc(k.title)}</div></div><div class="ti-right"><div class="ti-stage"${c}>${esc(k.stage)}</div><div class="ti-age"${c}>${k.blocked ? 'blocked · ' : ''}${esc(k.days)}d</div></div></div>`
-  }).join('') || '<div class="empty-note">—</div>'
+  const items = t.inFlightTickets || []
+  if (!items.length) return '<div class="empty-note">—</div>'
+  // Group active tickets by stage, blocked-heavy stages first.
+  const byStage = new Map()
+  for (const k of items) {
+    if (!byStage.has(k.stage)) byStage.set(k.stage, [])
+    byStage.get(k.stage).push(k)
+  }
+  const stages = [...byStage.keys()].sort((a, b) => byStage.get(b).length - byStage.get(a).length)
+  return stages.map((stage) => {
+    const rows = byStage.get(stage)
+    const blk = rows.filter((r) => r.blocked).length
+    return `<div class="stage-group">
+      <div class="stage-head"><span>${esc(stage)}</span><span class="stage-count">${rows.length}${blk ? ` · <span style="color:var(--ember)">${blk} blocked</span>` : ''}</span></div>
+      ${rows.map(ticketRow).join('')}
+    </div>`
+  }).join('')
+}
+function backlogSection(t) {
+  const items = t.backlogTickets || []
+  if (!items.length) return ''
+  // Group backlog by stage too, inside one collapsed dropdown.
+  const byStage = new Map()
+  for (const k of items) {
+    if (!byStage.has(k.stage)) byStage.set(k.stage, [])
+    byStage.get(k.stage).push(k)
+  }
+  const stages = [...byStage.keys()].sort((a, b) => byStage.get(b).length - byStage.get(a).length)
+  const body = stages.map((stage) => `<div class="stage-group">
+      <div class="stage-head"><span>${esc(stage)}</span><span class="stage-count">${byStage.get(stage).length}</span></div>
+      ${byStage.get(stage).map(ticketRow).join('')}
+    </div>`).join('')
+  return `<details class="grp backlog-grp">
+    <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">📥 Backlog</span><span class="grp-count">${items.length}</span><span class="grp-hint">not started — click to expand</span></summary>
+    <div class="grp-body">${body}</div>
+  </details>`
 }
 function whyBox(t) {
   const b = t.healthBreakdown || {}
@@ -246,8 +321,9 @@ function detailPanel(t, snap) {
         ${shippedRows(t)}
       </div>
       <div>
-        <div class="sub-title">🔄 In flight (${esc((t.inFlightTickets || []).length)} of ${esc(t.inFlight)})</div>
+        <div class="sub-title">🔄 Active — in flight (${esc(t.inFlight)})</div>
         ${inflightRows(t)}
+        ${backlogSection(t)}
         <div class="sub-title">📅 Sprint cadence</div>
         <div class="cadence-box"><div>Standup: ${esc(t.standup)}</div><div>Sprint Planning: ${esc(t.sprintPlanning)}</div></div>
       </div>
@@ -293,7 +369,7 @@ function render(snap) {
     + `<div class="exec-grid">${snap.teams.map((t) => teamCard(t, snap)).join('')}</div>`
     + `<div class="two-col">${blockersCard(snap)}${ceremoniesCard(snap)}</div>`
     + `<div class="two-col">${lifecycleCard(snap)}${roiCard(snap)}</div>`
-    + `<div class="two-col">${initiativesCard(snap)}${agentsCard()}</div>`
+    + initiativesCard(snap)
     + `</div>`
   dashEl.dataset.rendered = '1'
   dashEl.querySelectorAll('.team-card').forEach((el) => {
@@ -301,6 +377,7 @@ function render(snap) {
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(el.dataset.team) } })
   })
   document.getElementById('dashRefresh')?.addEventListener('click', manualRefresh)
+  document.getElementById('agentEgg')?.addEventListener('click', openAgents)
   renderTicker(snap)
 }
 
