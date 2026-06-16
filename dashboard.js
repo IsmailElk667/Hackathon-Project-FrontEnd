@@ -24,6 +24,9 @@ let lastHash = null
 let revealed = false
 let es = null
 let pollTimer = null
+let mode = 'team'   // 'team' | 'leadership' — toggled in the header
+let lastMode = null
+let leadFilter = { kind: 'all', team: 'all' }   // leadership-view filters
 
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -63,6 +66,10 @@ function header(snap) {
       <div class="dash-sub" id="dashSub">Sprint ${esc(snap.sprint.number)} · Week of ${esc(snap.sprint.week)} · Updated ${esc(timeAgo(snap.generatedAt))}</div>
     </div>
     <div class="dash-meta">
+      <div class="view-toggle" role="tablist">
+        <button class="vt-btn ${mode === 'team' ? 'active' : ''}" data-mode="team">Team View</button>
+        <button class="vt-btn ${mode === 'leadership' ? 'active' : ''}" data-mode="leadership">Leadership</button>
+      </div>
       <span class="demo-pill ${cls}">${txt}</span>
       <span class="live-dot"></span><span>Live</span>
       <button class="dash-refresh" id="dashRefresh">↻ Refresh</button>
@@ -212,6 +219,116 @@ function initiativesCard(snap) {
   return `<div class="card"><div class="card-title">🎯 Initiatives &amp; Epics — by team<span class="ct-aside">${snap.initiatives.length} active epics</span></div>${groups}</div>`
 }
 
+// ── LEADERSHIP VIEW — company-level initiative health (the shared PM pitch) ────
+const statusColor = (s) => s === 'on-track' ? 'var(--circuit)' : s === 'at-risk' ? 'var(--amber)' : 'var(--ember)'
+
+function leadershipRollup(L, snap) {
+  const s = L.byStatus || { onTrack: 0, atRisk: 0, blocked: 0 }
+  const down = String(L.trend || '').startsWith('-')
+  return `<div class="metrics-row lead-rollup">
+    <div class="metric-card"><div class="metric-val">${esc(L.totalInitiatives ?? 0)}</div><div class="metric-lbl">Active initiatives</div><div class="metric-trend">${esc(L.byKind?.tech ?? 0)} tech · ${esc(L.byKind?.ops ?? 0)} ops</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--circuit)">${esc(L.onTrackPct ?? 0)}%</div><div class="metric-lbl">On track</div><div class="metric-trend">${s.onTrack} on track · ${s.atRisk} at risk · ${s.blocked} blocked</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--ember)">${esc(s.blocked)}</div><div class="metric-lbl">Blocked initiatives</div><div class="metric-trend" style="color:var(--ember)">need attention</div></div>
+    <div class="metric-card"><div class="metric-val" style="color:var(--amber)">${esc(L.completionPct ?? 0)}%</div><div class="metric-lbl">Overall completion</div><div class="metric-trend">${esc(L.doneChildren ?? 0)}/${esc(L.totalChildren ?? 0)} stories · <span style="color:${down ? 'var(--ember)' : 'var(--circuit)'}">${down ? '↓' : '↑'} ${esc(L.trend ?? '')} sprint</span></div></div>
+  </div>`
+}
+
+// Tier-3 strategic metrics the PMs asked for but Jira can't yet supply.
+function strategicPending(L) {
+  const cards = [
+    ['Outcome hit rate', '% of shipped epics that hit their success metric', 'needs a "Success Metric" field + post-ship review'],
+    ['Stakeholder alignment', '% of epics with sign-off before dev started', 'needs a sign-off field / checklist on each epic'],
+    ['Discovery → Delivery', 'ratio of time/tickets in discovery vs delivery', 'needs Discovery vs Delivery tagging on tickets'],
+    ['Date committed', 'when the business team signs off', 'needs a business-sign-off date field on initiatives'],
+  ]
+  return `<details class="grp strat-pending">
+    <summary class="grp-summary"><span class="grp-chevron">▸</span><span class="grp-name">📐 Strategic metrics</span><span class="grp-flag amber">pending Jira setup</span><span class="grp-hint">4 metrics ready once fields exist</span></summary>
+    <div class="grp-body"><div class="strat-grid">
+      ${cards.map(([name, desc, need]) => `<div class="strat-card">
+        <div class="strat-name">${esc(name)}</div>
+        <div class="strat-val">—</div>
+        <div class="strat-desc">${esc(desc)}</div>
+        <div class="strat-need">⚙ ${esc(need)}</div>
+      </div>`).join('')}
+    </div></div>
+  </details>`
+}
+
+function filterControls(snap) {
+  const teams = snap.teams.map((t) => t.id)
+  const chip = (k, label) => `<button class="lead-chip ${leadFilter.kind === k ? 'active' : ''}" data-kind="${k}">${label}</button>`
+  const teamOpts = ['all', ...teams].map((tid) => {
+    const t = snap.teams.find((x) => x.id === tid)
+    return `<option value="${tid}" ${leadFilter.team === tid ? 'selected' : ''}>${tid === 'all' ? 'All teams' : esc(t?.name || tid)}</option>`
+  }).join('')
+  return `<span class="lead-filters">
+    ${chip('all', 'All')}${chip('tech', 'Tech')}${chip('ops', 'Ops')}
+    <select class="lead-team-select" id="leadTeamSelect">${teamOpts}</select>
+  </span>`
+}
+
+function filteredInitiatives(snap) {
+  const rank = { blocked: 0, 'at-risk': 1, 'on-track': 2 }
+  return (snap.initiatives || [])
+    .filter((i) => leadFilter.kind === 'all' || (i.kind || 'tech') === leadFilter.kind)
+    .filter((i) => leadFilter.team === 'all' || i.teamId === leadFilter.team)
+    .sort((a, b) => (rank[a.status] - rank[b.status]) || (b.progressPct - a.progressPct))
+}
+
+function initiativeTable(snap) {
+  const rows = filteredInitiatives(snap)
+  if (!rows.length) return `<div class="card"><div class="empty-note">No initiatives match this filter.</div></div>`
+  const body = rows.map((i, idx) => {
+    const team = snap.teams.find((t) => t.id === i.teamId)
+    const color = statusColor(i.status)
+    const kindBadge = (i.kind || 'tech') === 'ops'
+      ? `<span class="kind-badge ops">Ops</span>`
+      : `<span class="kind-badge tech">Tech</span>`
+    return `<tr>
+      <td class="it-num">${idx + 1}</td>
+      <td class="it-name">${esc(i.name)}<span class="it-id">${esc(i.id)}</span></td>
+      <td>${esc(team?.shortName || i.teamId)}</td>
+      <td>${kindBadge}</td>
+      <td class="it-prog">
+        <div class="it-bar-wrap"><div class="it-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
+        <span class="it-pct" style="color:${color}">${esc(i.progressPct)}%</span>
+      </td>
+      <td class="it-stories">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? ` <span style="color:var(--ember)">· ${esc(i.blockedChildren)}⛔</span>` : ''}</td>
+      <td><span class="it-status" style="color:${color}">${esc(String(i.status).replace('-', ' '))}</span></td>
+    </tr>`
+  }).join('')
+  return `<div class="card lead-table-card"><table class="lead-table">
+    <thead><tr><th>#</th><th>Initiative</th><th>Team</th><th>Type</th><th>Completion</th><th>Stories</th><th>Status</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`
+}
+
+function leadershipBody(snap) {
+  const L = snap.leadership || {}
+  return `<div class="dash-body">
+    <div class="section-label">Company initiatives — leadership health check</div>
+    ${leadershipRollup(L, snap)}
+    ${strategicPending(L)}
+    <div class="section-label lead-table-head" style="margin-top:8px">All initiatives ${filterControls(snap)}</div>
+    <div id="leadTableMount">${initiativeTable(snap)}</div>
+  </div>`
+}
+
+function wireLeadership(snap) {
+  const remount = () => {
+    const mount = document.getElementById('leadTableMount')
+    if (mount) mount.innerHTML = initiativeTable(snap)
+    // re-sync chip active states
+    dashEl.querySelectorAll('.lead-chip').forEach((c) => c.classList.toggle('active', c.dataset.kind === leadFilter.kind))
+  }
+  dashEl.querySelectorAll('.lead-chip').forEach((c) => c.addEventListener('click', () => {
+    leadFilter.kind = c.dataset.kind; remount()
+  }))
+  document.getElementById('leadTeamSelect')?.addEventListener('change', (e) => {
+    leadFilter.team = e.target.value; remount()
+  })
+}
+
 // Hidden easter egg — revealed only by clicking the hex logo in the header.
 function agentsPanel() {
   const rows = [
@@ -347,16 +464,8 @@ function renderTicker(snap) {
 }
 
 // ── Master render (hash-guarded so the ticker doesn't reset on no-op pushes) ──
-function render(snap) {
-  snapshot = snap
-  const changed = snap.hash !== lastHash
-  if (!changed && dashEl.dataset.rendered) {
-    const sub = document.getElementById('dashSub')
-    if (sub) sub.textContent = `Sprint ${snap.sprint.number} · Week of ${snap.sprint.week} · Updated ${timeAgo(snap.generatedAt)}`
-    return
-  }
-  lastHash = snap.hash
-  dashEl.innerHTML = header(snap) + `<div class="dash-body">`
+function teamBody(snap) {
+  return `<div class="dash-body">`
     + narrative(snap)
     + `<div class="section-label">Sprint ${esc(snap.sprint.number)} at a glance</div>` + metricsRow(snap)
     + `<div class="section-label" style="margin-top:8px">All teams — AI health overview</div>`
@@ -365,13 +474,36 @@ function render(snap) {
     + `<div class="two-col">${lifecycleCard(snap)}${roiCard(snap)}</div>`
     + initiativesCard(snap)
     + `</div>`
+}
+
+function render(snap) {
+  snapshot = snap
+  const changed = snap.hash !== lastHash || mode !== lastMode
+  if (!changed && dashEl.dataset.rendered) {
+    const sub = document.getElementById('dashSub')
+    if (sub) sub.textContent = `Sprint ${snap.sprint.number} · Week of ${snap.sprint.week} · Updated ${timeAgo(snap.generatedAt)}`
+    return
+  }
+  lastHash = snap.hash
+  lastMode = mode
+  dashEl.innerHTML = header(snap) + (mode === 'leadership' ? leadershipBody(snap) : teamBody(snap))
   dashEl.dataset.rendered = '1'
-  dashEl.querySelectorAll('.team-card').forEach((el) => {
-    el.addEventListener('click', () => openDetail(el.dataset.team))
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(el.dataset.team) } })
-  })
+  if (mode === 'team') {
+    dashEl.querySelectorAll('.team-card').forEach((el) => {
+      el.addEventListener('click', () => openDetail(el.dataset.team))
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(el.dataset.team) } })
+    })
+  } else {
+    wireLeadership(snap)
+  }
   document.getElementById('dashRefresh')?.addEventListener('click', manualRefresh)
   document.getElementById('agentEgg')?.addEventListener('click', openAgents)
+  dashEl.querySelectorAll('.vt-btn').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.mode === mode) return
+    mode = b.dataset.mode
+    render(snapshot)
+    dashEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }))
   renderTicker(snap)
 }
 

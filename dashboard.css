@@ -257,6 +257,50 @@
 .af-th { font-size: 11px; color: var(--silver); }
 .agent-foot { font-size: 11px; color: var(--silver); text-align: center; margin-top: 14px; font-style: italic; }
 
+/* ─── VIEW TOGGLE (Team ⇄ Leadership) ─── */
+.view-toggle { display: inline-flex; background: var(--graphite); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; }
+.vt-btn { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .03em; color: var(--silver); background: transparent; border: none; padding: 6px 13px; border-radius: 6px; cursor: pointer; transition: background .15s, color .15s; }
+.vt-btn:hover { color: var(--paper); }
+.vt-btn.active { background: var(--amber); color: #0a0a0a; }
+
+/* ─── LEADERSHIP: strategic pending metrics ─── */
+.strat-pending { margin-bottom: 14px; }
+.strat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.strat-card { background: var(--graphite); border: 1px dashed var(--border2); border-radius: 8px; padding: 12px; opacity: .85; }
+.strat-name { font-size: 12px; font-weight: 700; color: var(--paper); }
+.strat-val { font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--silver); margin: 4px 0; }
+.strat-desc { font-size: 10.5px; color: var(--silver); line-height: 1.4; }
+.strat-need { font-size: 10px; color: var(--amber); margin-top: 8px; font-family: var(--mono); }
+
+/* ─── LEADERSHIP: filters ─── */
+.lead-table-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lead-filters { display: inline-flex; align-items: center; gap: 6px; }
+.lead-chip { font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: var(--silver); background: var(--graphite); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; cursor: pointer; transition: all .15s; }
+.lead-chip:hover { border-color: var(--border2); color: var(--paper); }
+.lead-chip.active { background: rgba(245,166,35,.14); color: var(--amber); border-color: rgba(245,166,35,.4); }
+.lead-team-select { font-family: var(--mono); font-size: 10.5px; color: var(--paper); background: var(--graphite); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; cursor: pointer; }
+
+/* ─── LEADERSHIP: initiative table ─── */
+.lead-table-card { padding: 0; overflow: hidden; }
+.lead-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.lead-table thead th { text-align: left; font-family: var(--mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--silver); padding: 11px 14px; border-bottom: 1px solid var(--border2); background: rgba(255,255,255,.015); position: sticky; top: 0; }
+.lead-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+.lead-table tbody tr:hover { background: rgba(245,166,35,.04); }
+.lead-table tbody tr:last-child { border-bottom: none; }
+.lead-table td { padding: 10px 14px; vertical-align: middle; color: var(--paper); }
+.it-num { color: var(--silver); font-family: var(--mono); font-size: 11px; width: 36px; }
+.it-name { font-weight: 600; max-width: 360px; }
+.it-id { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--silver); margin-top: 2px; }
+.it-prog { min-width: 150px; }
+.it-bar-wrap { display: inline-block; vertical-align: middle; width: 90px; height: 6px; background: var(--graphite); border-radius: 3px; overflow: hidden; margin-right: 8px; }
+.it-bar { height: 100%; border-radius: 3px; }
+.it-pct { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+.it-stories { font-family: var(--mono); font-size: 11px; color: var(--silver); }
+.it-status { font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.kind-badge { font-family: var(--mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 4px; padding: 2px 7px; }
+.kind-badge.tech { background: rgba(59,130,246,.14); color: var(--blue); }
+.kind-badge.ops { background: rgba(139,92,246,.16); color: var(--purple); }
+
 /* ─── DIVIDER ─── */
 .section-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 
