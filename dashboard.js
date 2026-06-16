@@ -148,7 +148,20 @@ function teamCard(t, snap) {
     <div class="tc-stats">
       ${stats.map(([v, l, c]) => `<div class="tc-stat"><div class="tc-val"${c ? ` style="color:${c}"` : ''}>${esc(v)}</div><div class="tc-lbl">${esc(l)}</div></div>`).join('')}
     </div>
+    ${queueDepthRow(t)}
   </div>`
+}
+
+// Hand-off queue depth chips on a team card (Code Review / QA Done / Ready).
+function queueDepthRow(t) {
+  const q = t.queueDepth
+  if (!q || q.total === 0) return ''
+  const items = []
+  if (q.codeReview)    items.push([q.codeReview, 'in review',  q.hottest === 'codeReview'])
+  if (q.qaDone)        items.push([q.qaDone,      'QA done',    q.hottest === 'qaDone'])
+  if (q.readyToDeploy) items.push([q.readyToDeploy, 'ready',    q.hottest === 'readyToDeploy'])
+  return `<div class="tc-queue">${items.map(([n, l, hot]) =>
+    `<span class="tq-item${hot ? ' tq-hot' : ''}">${n} ${l}</span>`).join('')}</div>`
 }
 
 function blockersCard(snap) {
@@ -193,6 +206,41 @@ function roiCard(snap) {
     return `<div class="roi-row"><div class="roi-name"><div class="roi-dot" style="background:${color}"></div>${esc(t.shortName || t.name)}</div><div class="roi-bar-wrap"><div class="roi-bar" style="width:${pct(t.effortScore * 100)}%;background:${color}"></div></div><div class="roi-verdict" style="color:${color}">${esc(t.effortLabel)}</div></div>`
   }).join('')
   return `<div class="card"><div class="card-title">📊 Effort vs. Output — Sprint ${esc(snap.sprint.number)}</div><div class="card-hint">Tickets shipped ÷ dev capacity consumed · effort-scoring agent</div>${rows}</div>`
+}
+
+// Cycle-time-by-stage card (per-stage avg hours + bottleneck flag + P90 age).
+// Per-stage bars need stageHistory (Jira changelog — not yet wired), so live
+// mode shows "No stage data" until then; the P90 age column always works.
+function cycleTimeCard(snap) {
+  const SHOW = new Set(['In Dev', 'Code Review', 'In QA', 'QA Done', 'Ready to Deploy'])
+  const allHours = snap.teams.flatMap((t) => (t.cycleTime?.byStage || [])
+    .filter((s) => SHOW.has(s.stage)).map((s) => s.avgHours))
+  const maxH = Math.max(...allHours, 1)
+
+  const rows = snap.teams.map((t) => {
+    const ct = t.cycleTime
+    const color = healthColorVar(t)
+    const stages = (ct?.byStage || []).filter((s) => SHOW.has(s.stage))
+    const p90c = (ct?.p90AgeDays ?? 0) >= 7 ? 'var(--ember)' : (ct?.p90AgeDays ?? 0) >= 5 ? 'var(--amber)' : 'var(--silver)'
+    const p90 = `<div class="ct-p90" style="color:${p90c}">${esc(ct?.p90AgeDays ?? 0)}d<div class="ct-p90lbl">P90</div></div>`
+    if (!stages.length) {
+      return `<div class="ct-row"><div class="ct-name" style="color:${color}">${esc(t.shortName)}</div><div class="ct-stages"><span class="ct-nodata">No stage data</span></div>${p90}</div>`
+    }
+    const stageHtml = stages.map((s) => {
+      const hot = ct.bottleneck?.stage === s.stage
+      const w = Math.max(4, Math.round((s.avgHours / maxH) * 100))
+      const c = hot ? 'var(--amber)' : 'rgba(139,143,168,.4)'
+      return `<div class="ct-stage-wrap">
+        <div class="ct-slbl"${hot ? ' style="color:var(--amber)"' : ''}>${esc(s.stage)}${hot ? ' ⚑' : ''}</div>
+        <div class="ct-track"><div class="ct-bar" style="width:${w}%;background:${c}"></div></div>
+        <div class="ct-hrs"${hot ? ' style="color:var(--amber)"' : ''}>${esc(s.avgHours)}h</div>
+      </div>`
+    }).join('')
+    return `<div class="ct-row"><div class="ct-name" style="color:${color}">${esc(t.shortName)}</div><div class="ct-stages">${stageHtml}</div>${p90}</div>`
+  }).join('')
+
+  return `<div class="card"><div class="card-title">⏱ Cycle Time by Stage<span class="ct-aside">avg hours · ⚑ bottleneck · P90 ticket age</span></div>
+    <div class="card-hint">Where tickets spend the most time. High P90 signals a zombie ticket hiding behind the average.</div>${rows}</div>`
 }
 
 function initiativeRow(i, snap) {
@@ -406,10 +454,12 @@ function wireLeadership(snap) {
 // Hidden easter egg — revealed only by clicking the hex logo in the header.
 function agentsPanel() {
   const rows = [
-    ['Health agent', 'health.js', '100 − 15·breaches − 6·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥1 breach → blocked'],
+    ['Health agent', 'health.js', '100 − 15·breaches − (3/6/9)·blockers − 40·stalledRatio − 10·wipAge + velocity', '≥75 healthy · 40–74 at-risk · <40 or ≥2 breaches → blocked'],
     ['SLA agent', 'sla.js', 'age vs 24–32h window', '≥32h breach · 24–32h warning · ≥18h approaching'],
     ['Effort agent', 'effort.js', 'shipped ÷ (shipped + 0.5·inFlight + 0.75·stalled)', '≥0.8 Strong · ≥0.6 Good · ≥0.4 Blocked · else Critical'],
-    ['Initiative agent', 'deriveInitiatives.js', 'done ÷ total children vs expected pace', 'blocked if any child blocked · at-risk if behind pace'],
+    ['Initiative agent', 'deriveInitiatives.js', 'done ÷ total children', 'blocked if any child blocked · at-risk if sizable & 0% done'],
+    ['Queue depth', 'queueDepth.js', 'tickets at Code Review · QA Done · Ready to Deploy', 'high count = review bottleneck or deploy-queue jam'],
+    ['Cycle time', 'cycleTime.js', 'avg hours per stage + P90 ticket age', 'bottleneck = stage with highest avg · P90 catches zombie tickets'],
   ]
   return `<div class="detail-panel">
     <div class="detail-top">
@@ -479,6 +529,7 @@ function whyBox(t) {
     <div class="why-row"><span class="wr-k">Base</span><span class="wr-v base">100</span></div>
     ${row(`SLA breaches (${b.breaches ?? 0})`, b.sla ?? 0, 'minus')}
     ${row(`Active blockers (${b.blockerCount ?? 0})`, b.blockers ?? 0, 'minus')}
+    ${(() => { const s = b.blockersByState || {}; const parts = [s.warning && `${s.warning} warning (−9)`, s.approaching && `${s.approaching} approaching (−6)`, s.ok && `${s.ok} ok (−3)`].filter(Boolean); return parts.length ? `<div class="why-row why-sub"><span class="wr-k">↳ by age</span><span class="wr-v wr-sub">${parts.join(' · ')}</span></div>` : '' })()}
     ${row(`Stalled ratio (${b.stalledRatio ?? 0})`, b.stalled ?? 0, 'minus')}
     ${row(`WIP age (${b.avgInFlightDays ?? 0}d avg)`, b.wip ?? 0, 'minus')}
     ${row(`Velocity (Δ ${b.velocityDelta ?? 0})`, b.velocity ?? 0, (b.velocity ?? 0) >= 0 ? 'plus' : 'minus')}
@@ -547,6 +598,7 @@ function teamBody(snap) {
     + `<div class="exec-grid">${snap.teams.map((t) => teamCard(t, snap)).join('')}</div>`
     + `<div class="two-col">${blockersCard(snap)}${ceremoniesCard(snap)}</div>`
     + `<div class="two-col">${lifecycleCard(snap)}${roiCard(snap)}</div>`
+    + cycleTimeCard(snap)
     + initiativesCard(snap)
     + `</div>`
 }

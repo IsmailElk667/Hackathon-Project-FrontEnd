@@ -301,6 +301,30 @@
 .kind-badge.tech { background: rgba(59,130,246,.14); color: var(--blue); }
 .kind-badge.ops { background: rgba(139,92,246,.16); color: var(--purple); }
 
+/* ─── TEAM CARD: queue-depth chips ─── */
+.tc-queue { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.tq-item { font-family: var(--mono); font-size: 9.5px; color: var(--silver); background: var(--graphite); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; }
+.tq-item.tq-hot { color: var(--amber); border-color: rgba(245,166,35,.4); background: rgba(245,166,35,.08); }
+
+/* ─── CYCLE TIME card ─── */
+.ct-row { display: grid; grid-template-columns: 52px 1fr 54px; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.ct-row:last-child { border-bottom: none; }
+.ct-name { font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.ct-stages { display: flex; flex-direction: column; gap: 4px; }
+.ct-stage-wrap { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 8px; }
+.ct-slbl { font-size: 10.5px; color: var(--silver); white-space: nowrap; }
+.ct-track { height: 5px; background: var(--graphite); border-radius: 3px; overflow: hidden; }
+.ct-bar { height: 100%; border-radius: 3px; }
+.ct-hrs { font-family: var(--mono); font-size: 10.5px; color: var(--silver); text-align: right; }
+.ct-nodata { font-size: 11px; color: var(--silver); }
+.ct-p90 { font-family: var(--mono); font-size: 15px; font-weight: 800; text-align: center; }
+.ct-p90lbl { font-size: 8.5px; font-weight: 600; letter-spacing: .08em; color: var(--silver); }
+
+/* ─── WHY-BOX: blocker by-age sub-row ─── */
+.why-sub { padding-left: 10px; }
+.why-sub .wr-k { font-size: 10px; }
+.why-sub .wr-sub { font-size: 10px; color: var(--silver); font-weight: 400; font-family: var(--mono); }
+
 /* ─── LEADERSHIP TABLE: per-team group header rows ─── */
 .it-group > td { padding: 12px 14px 7px; border-bottom: 1px solid var(--border2); background: rgba(255,255,255,.02); }
 .it-group:not(:first-child) > td { padding-top: 20px; }
