@@ -335,79 +335,130 @@ function filterControls(snap) {
 }
 
 function filteredInitiatives(snap) {
-  const rank = { blocked: 0, 'at-risk': 1, 'on-track': 2 }
   return (snap.initiatives || [])
     .filter((i) => leadFilter.kind === 'all' || (i.kind || 'tech') === leadFilter.kind)
     .filter((i) => leadFilter.team === 'all' || i.teamId === leadFilter.team)
-    .sort((a, b) => (rank[a.status] - rank[b.status]) || (b.progressPct - a.progressPct))
+    .sort((a, b) => (b.progressPct - a.progressPct))  // done → in progress
 }
 
-function storyDetailRow(i) {
-  const stories = i.stories || []
-  if (!stories.length) return `<td colspan="8"><div class="story-empty">No linked stories — add child issues in Jira.</div></td>`
-  const items = stories.map((s) => {
-    const st = s.done ? 'done' : s.blocked ? 'blocked' : 'on-track'
-    return `<div class="story-row">
-      ${hexCell(st, 13)}
-      <span class="story-id">${esc(s.id)}</span>
-      <span class="story-title ${s.done ? 'is-done' : ''}">${esc(s.title)}</span>
-      <span class="story-stage">${esc(s.stage)}${s.blocked ? ' · blocked' : ''}</span>
-    </div>`
-  }).join('')
-  return `<td colspan="8"><div class="story-list">${items}</div></td>`
-}
+// Collapsible initiative groups for the leadership view.
+// Each team is a <details> (auto-opens when it has blocked initiatives).
+// Each initiative inside is another <details> that expands the story list.
+// Sorted done → in progress (progressPct DESC) within each team.
+function initiativeGroups(snap) {
+  const items = filteredInitiatives(snap)
+  if (!items.length) return '<div class="empty-note">No initiatives match this filter.</div>'
 
-function initiativeTableRow(i, snap) {
-  const team = snap.teams.find((t) => t.id === i.teamId)
-  const color = statusColor(i.status)
-  const kindBadge = (i.kind || 'tech') === 'ops'
-    ? `<span class="kind-badge ops">Ops</span>`
-    : `<span class="kind-badge tech">Tech</span>`
-  return `<tr class="it-row" data-init="${esc(i.id)}" tabindex="0">
-    <td class="it-hex">${hexCell(i.status)}</td>
-    <td class="it-name">${esc(i.name)}<span class="it-id">${esc(i.id)}</span></td>
-    <td>${esc(team?.shortName || i.teamId)}</td>
-    <td>${kindBadge}</td>
-    <td class="it-prog">
-      <div class="it-bar-wrap"><div class="it-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
-      <span class="it-pct" style="color:${color}">${esc(i.progressPct)}%</span>
-    </td>
-    <td class="it-stories">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? ` <span style="color:var(--ember)">· ${esc(i.blockedChildren)}⛔</span>` : ''}</td>
-    <td><span class="it-status" style="color:${color}">${esc(String(i.status).replace('-', ' '))}</span></td>
-    <td class="it-chev"><span class="it-chevron">▸</span></td>
-  </tr>
-  <tr class="it-detail" data-detail="${esc(i.id)}" hidden>${storyDetailRow(i)}</tr>`
-}
-
-function initiativeTable(snap) {
-  const rows = filteredInitiatives(snap)
-  if (!rows.length) return `<div class="card"><div class="empty-note">No initiatives match this filter.</div></div>`
-
-  // Group by team (in team-list order); rows within a team keep the blocked-first
-  // sort from filteredInitiatives. A team sub-header leads each group.
   const order = snap.teams.map((t) => t.id)
   const byTeam = new Map()
-  for (const i of rows) {
+  for (const i of items) {
     if (!byTeam.has(i.teamId)) byTeam.set(i.teamId, [])
     byTeam.get(i.teamId).push(i)
   }
   const teamIds = [...byTeam.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
 
-  const body = teamIds.map((tid) => {
+  return teamIds.map((tid) => {
     const team = snap.teams.find((t) => t.id === tid)
-    const items = byTeam.get(tid)
-    const blocked = items.filter((i) => i.status === 'blocked').length
-    const atRisk = items.filter((i) => i.status === 'at-risk').length
+    const inits = byTeam.get(tid)
+    const blocked = inits.filter((i) => i.status === 'blocked').length
+    const atRisk  = inits.filter((i) => i.status === 'at-risk').length
     const flag = blocked ? `<span class="grp-flag red">${blocked} blocked</span>`
-      : atRisk ? `<span class="grp-flag amber">${atRisk} at risk</span>` : ''
-    const header = `<tr class="it-group"><td colspan="8"><span class="itg-name">${esc(team?.name || tid)}</span><span class="itg-count">${items.length}</span>${flag}</td></tr>`
-    return header + items.map((i) => initiativeTableRow(i, snap)).join('')
+               : atRisk  ? `<span class="grp-flag amber">${atRisk} at risk</span>` : ''
+
+    const initRows = inits.map((i) => {
+      const ic = statusColor(i.status)
+      const kindBadge = (i.kind || 'tech') === 'ops'
+        ? `<span class="kind-badge ops">Ops</span>`
+        : `<span class="kind-badge tech">Tech</span>`
+      const stories = i.stories || []
+      const storyHtml = stories.length
+        ? stories.map((s) => {
+            const st = s.done ? 'done' : s.blocked ? 'blocked' : 'on-track'
+            return `<div class="story-row">${hexCell(st, 13)}<span class="story-id">${esc(s.id)}</span><span class="story-title ${s.done ? 'is-done' : ''}">${esc(s.title)}</span><span class="story-stage">${esc(s.stage)}${s.blocked ? ' · blocked' : ''}</span></div>`
+          }).join('')
+        : `<div class="story-empty">No linked stories — add child issues in Jira.</div>`
+      return `<details class="li-init">
+        <summary class="li-init-head">
+          <span class="li-chev">▸</span>
+          ${hexCell(i.status, 15)}
+          <span class="li-init-name">${esc(i.name)}</span>
+          ${kindBadge}
+          <div class="li-prog-wrap"><div class="li-prog-bar"><div class="li-prog-fill" style="width:${pct(i.progressPct)}%;background:${ic}"></div></div><span class="li-prog-pct" style="color:${ic}">${esc(i.progressPct)}%</span></div>
+          <span class="li-stories-lbl">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? `<span style="color:var(--ember)"> ·${esc(i.blockedChildren)}⛔</span>` : ''}</span>
+          <span class="li-status-lbl" style="color:${ic}">${esc(String(i.status).replace('-', ' '))}</span>
+        </summary>
+        <div class="li-init-body"><div class="story-list">${storyHtml}</div></div>
+      </details>`
+    }).join('')
+
+    return `<details class="li-team"${blocked > 0 ? ' open' : ''}>
+      <summary class="li-team-head">
+        <span class="li-chev">▸</span>
+        ${hexCell(team?.health || 'on-track', 16)}
+        <span class="li-team-name">${esc(team?.name || tid)}</span>
+        <span class="grp-count">${inits.length}</span>
+        ${flag}
+      </summary>
+      <div class="li-team-body">${initRows}</div>
+    </details>`
+  }).join('')
+}
+
+// Business ↔ Tech Bridge — translates engineering health into business-language outcomes.
+// Each team card shows: business domain + goal + impact statement + key KPIs.
+// Leadership sees risk and momentum in terms they care about, not ticket counts.
+function businessBridge(snap) {
+  const DOMAINS = {
+    lo:        { icon: '🏦', goal: 'Lender activation & portal experience' },
+    pay:       { icon: '💳', goal: 'Payment processing & ACH reliability' },
+    uw:        { icon: '⚖️', goal: 'Risk assessment & compliance' },
+    analytics: { icon: '📊', goal: 'Data visibility & reporting' },
+    infra:     { icon: '🔧', goal: 'Platform reliability & developer velocity' },
+  }
+  const cards = snap.teams.filter((t) => !t.isCenter).map((t) => {
+    const d = DOMAINS[t.id] || { icon: '⬡', goal: 'Engineering delivery' }
+    const inits = (snap.initiatives || []).filter((i) => i.teamId === t.id)
+    const blocked = inits.filter((i) => i.status === 'blocked').length
+    const atRisk  = inits.filter((i) => i.status === 'at-risk').length
+    const onTrack = inits.filter((i) => i.status === 'on-track').length
+    const pill = healthPill(t)
+    let impact
+    if (t.health === 'blocked' || blocked > 0) {
+      impact = `<div class="br-impact br-impact-red">⚠ ${blocked} initiative${blocked !== 1 ? 's' : ''} blocked — ${d.goal.split('&')[0].trim()} delivery at risk this sprint</div>`
+    } else if (t.health === 'at-risk' || atRisk > 0) {
+      impact = `<div class="br-impact br-impact-amber">△ ${atRisk || t.stalled} item${(atRisk || t.stalled) !== 1 ? 's' : ''} at risk — timeline may slip</div>`
+    } else {
+      impact = `<div class="br-impact br-impact-green">✓ On track — ${d.goal.split('&')[0].trim()} delivering on schedule</div>`
+    }
+    const kpiLine = t.id === 'pay'
+      ? `<div class="br-kpi">ACH success rate <strong style="color:var(--circuit)">${esc(snap.sprint.achSuccessRate)}%</strong></div>`
+      : ''
+    return `<div class="br-card">
+      <div class="br-top">
+        <span class="br-icon">${d.icon}</span>
+        <div class="br-info"><div class="br-name">${esc(t.name)}</div><div class="br-goal">${esc(d.goal)}</div></div>
+        <span class="health-pill ${pill.cls}">${pill.label}</span>
+      </div>
+      ${impact}${kpiLine}
+      <div class="br-stats">
+        <span>${inits.length} initiatives</span>
+        ${onTrack ? `<span style="color:var(--circuit)">${onTrack} on track</span>` : ''}
+        ${atRisk  ? `<span style="color:var(--amber)">${atRisk} at risk</span>` : ''}
+        ${blocked ? `<span style="color:var(--ember)">${blocked} blocked</span>` : ''}
+      </div>
+    </div>`
   }).join('')
 
-  return `<div class="card lead-table-card"><table class="lead-table">
-    <thead><tr><th class="th-hex">Health</th><th>Initiative</th><th>Team</th><th>Type</th><th>Completion</th><th>Stories</th><th>Status</th><th></th></tr></thead>
-    <tbody>${body}</tbody>
-  </table></div>`
+  const infraNote = snap.infraBlockers?.length
+    ? `<div class="br-infra-note">🔧 <strong>${snap.infraBlockers.length}</strong> cross-team blocker${snap.infraBlockers.length !== 1 ? 's' : ''} in Infra — ${snap.infraBlockers.filter((b) => b.escalate).length > 0 ? `${snap.infraBlockers.filter((b) => b.escalate).length} past SLA, escalation needed` : 'within SLA window'}</div>`
+    : ''
+
+  return `<div class="card br-section">
+    <div class="card-title">🌉 Business ↔ Tech Bridge<span class="ct-aside">engineering health → business outcome</span></div>
+    <div class="card-hint">Technical blockers translated into business risk — leadership sees impact, not ticket counts.</div>
+    <div class="br-grid">${cards}</div>
+    ${infraNote}
+  </div>`
 }
 
 function leadershipBody(snap) {
@@ -415,40 +466,21 @@ function leadershipBody(snap) {
   return `<div class="dash-body">
     <div class="section-label">Company initiatives — leadership health check</div>
     ${leadershipRollup(L, snap)}
+    ${businessBridge(snap)}
     ${strategicPending(L)}
     <div class="section-label lead-table-head" style="margin-top:8px">All initiatives ${filterControls(snap)}</div>
-    <div id="leadTableMount">${initiativeTable(snap)}</div>
+    <div id="leadTableMount"><div class="card li-card">${initiativeGroups(snap)}</div></div>
   </div>`
 }
 
-function wireInitiativeRows() {
-  const toggle = (row) => {
-    const detail = row.nextElementSibling
-    if (!detail || !detail.classList.contains('it-detail')) return
-    const open = detail.hidden
-    detail.hidden = !open
-    row.classList.toggle('expanded', open)
-  }
-  dashEl.querySelectorAll('.it-row').forEach((row) => {
-    row.addEventListener('click', () => toggle(row))
-    row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(row) } })
-  })
-}
 function wireLeadership(snap) {
   const remount = () => {
     const mount = document.getElementById('leadTableMount')
-    if (mount) mount.innerHTML = initiativeTable(snap)
-    // re-sync chip active states
+    if (mount) mount.innerHTML = `<div class="card li-card">${initiativeGroups(snap)}</div>`
     dashEl.querySelectorAll('.lead-chip').forEach((c) => c.classList.toggle('active', c.dataset.kind === leadFilter.kind))
-    wireInitiativeRows()
   }
-  dashEl.querySelectorAll('.lead-chip').forEach((c) => c.addEventListener('click', () => {
-    leadFilter.kind = c.dataset.kind; remount()
-  }))
-  document.getElementById('leadTeamSelect')?.addEventListener('change', (e) => {
-    leadFilter.team = e.target.value; remount()
-  })
-  wireInitiativeRows()
+  dashEl.querySelectorAll('.lead-chip').forEach((c) => c.addEventListener('click', () => { leadFilter.kind = c.dataset.kind; remount() }))
+  document.getElementById('leadTeamSelect')?.addEventListener('change', (e) => { leadFilter.team = e.target.value; remount() })
 }
 
 // Hidden easter egg — revealed only by clicking the hex logo in the header.
