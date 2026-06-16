@@ -416,6 +416,31 @@
 .li-status-lbl { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-transform: capitalize; flex-shrink: 0; min-width: 68px; text-align: right; }
 .li-init-body { padding: 8px 18px 12px 54px; border-top: 1px solid var(--border); background: var(--graphite); }
 
+/* ─── LEADERSHIP: Sprint Health panel ─── */
+.sh-section { margin-bottom: 20px; }
+.sh-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 20px; align-items: center; margin-bottom: 16px; }
+.sh-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--silver); margin-bottom: 6px; }
+.sh-bar-wrap { height: 8px; background: var(--graphite); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+.sh-bar { height: 100%; border-radius: 4px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+.sh-bar-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--silver); }
+.sh-stat { text-align: center; }
+.sh-stat-val { font-size: 28px; font-weight: 800; color: var(--paper); line-height: 1; }
+.sh-stat-lbl { font-family: var(--mono); font-size: 9.5px; color: var(--silver); text-transform: uppercase; letter-spacing: .06em; margin: 4px 0 3px; }
+.sh-stat-trend { font-size: 11px; color: var(--silver); }
+.sh-teams { display: flex; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.sh-team { flex: 1; min-width: 60px; }
+.sh-team-name { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--silver); margin-bottom: 5px; text-align: center; }
+.sh-team-bar { height: 5px; background: var(--graphite); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.sh-team-fill { height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+.sh-team-score { font-family: var(--mono); font-size: 12px; font-weight: 700; text-align: center; }
+
+/* ─── LEADERSHIP: initiative search bar ─── */
+.lead-search-wrap { position: relative; display: inline-flex; align-items: center; }
+.lead-search-icon { position: absolute; left: 9px; font-size: 15px; color: var(--silver); pointer-events: none; line-height: 1; top: 50%; transform: translateY(-50%); }
+.lead-search { font-family: var(--mono); font-size: 11px; color: var(--paper); background: var(--graphite); border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px 5px 26px; outline: none; width: 200px; transition: border-color .15s, box-shadow .15s; }
+.lead-search:focus { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(245,166,35,.15); }
+.lead-search::placeholder { color: rgba(139,143,168,.45); }
+
 /* ─── LEADERSHIP: Business ↔ Tech Bridge ─── */
 .br-section { margin-bottom: 20px; }
 .br-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }

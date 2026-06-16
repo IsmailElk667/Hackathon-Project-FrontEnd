@@ -27,6 +27,7 @@ let pollTimer = null
 let mode = 'team'   // 'team' | 'leadership' — toggled in the header
 let lastMode = null
 let leadFilter = { kind: 'all', team: 'all' }   // leadership-view filters
+let leadSearch = ''                              // free-text initiative search
 
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -329,15 +330,18 @@ function filterControls(snap) {
     return `<option value="${tid}" ${leadFilter.team === tid ? 'selected' : ''}>${tid === 'all' ? 'All teams' : esc(t?.name || tid)}</option>`
   }).join('')
   return `<span class="lead-filters">
+    <span class="lead-search-wrap"><span class="lead-search-icon">⌕</span><input class="lead-search" id="leadSearch" placeholder="Search initiatives…" value="${esc(leadSearch)}" autocomplete="off"></span>
     ${chip('all', 'All')}${chip('tech', 'Tech')}${chip('ops', 'Ops')}
     <select class="lead-team-select" id="leadTeamSelect">${teamOpts}</select>
   </span>`
 }
 
 function filteredInitiatives(snap) {
+  const q = leadSearch.trim().toLowerCase()
   return (snap.initiatives || [])
     .filter((i) => leadFilter.kind === 'all' || (i.kind || 'tech') === leadFilter.kind)
     .filter((i) => leadFilter.team === 'all' || i.teamId === leadFilter.team)
+    .filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
     .sort((a, b) => (b.progressPct - a.progressPct))  // done → in progress
 }
 
@@ -404,6 +408,69 @@ function initiativeGroups(snap) {
   }).join('')
 }
 
+// Sprint Health panel — sprint timeline progress + velocity + blockers + per-team bars.
+// Derives sprint end date from team active sprints, assumes 2-week cadence.
+function sprintHealth(snap) {
+  const s = snap.sprint
+  const teamSprints = snap.teams.map((t) => t.activeSprint).filter((sp) => sp?.endDate)
+  let progressPct = 50, daysLeft = null, endLabel = s.week
+  if (teamSprints.length) {
+    const now = Date.now()
+    // Only use sprint dates within ±4 weeks to exclude stale/far-future outliers from Jira
+    const reasonable = teamSprints
+      .map((sp) => new Date(sp.endDate).getTime())
+      .filter((ms) => Number.isFinite(ms) && Math.abs(ms - now) < 28 * 86400000)
+    if (reasonable.length) {
+      const endMs = Math.max(...reasonable)
+      const msLeft = Math.max(0, endMs - now)
+      progressPct = Math.min(100, Math.max(0, Math.round(((14 * 86400000 - msLeft) / (14 * 86400000)) * 100)))
+      daysLeft = Math.ceil(msLeft / 86400000)
+      endLabel = new Date(endMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+  }
+  const down = String(s.trend).startsWith('-')
+  const barColor = daysLeft != null && daysLeft <= 2 ? 'var(--ember)' : progressPct > 70 ? 'var(--amber)' : 'var(--circuit)'
+  const slaStatus = s.infraAvgResponse >= 32
+    ? `<span style="color:var(--ember)">⚠ SLA breach</span>`
+    : s.infraAvgResponse >= 24
+      ? `<span style="color:var(--amber)">approaching SLA</span>`
+      : `<span style="color:var(--circuit)">✓ within SLA</span>`
+  const teamBars = snap.teams.filter((t) => !t.isCenter).map((t) => {
+    const color = healthColorVar(t)
+    return `<div class="sh-team">
+      <div class="sh-team-name">${esc(t.shortName)}</div>
+      <div class="sh-team-bar"><div class="sh-team-fill" style="width:${pct(t.healthScore)}%;background:${color}"></div></div>
+      <div class="sh-team-score" style="color:${color}">${t.healthScore}</div>
+    </div>`
+  }).join('')
+  return `<div class="card sh-section">
+    <div class="card-title">🏃 Sprint Health — Sprint ${esc(s.number)}<span class="ct-aside">${daysLeft != null ? `${daysLeft}d left · ends ${endLabel}` : esc(s.week)}</span></div>
+    <div class="sh-grid">
+      <div class="sh-progress">
+        <div class="sh-label">Sprint progress</div>
+        <div class="sh-bar-wrap"><div class="sh-bar" style="width:${progressPct}%;background:${barColor}"></div></div>
+        <div class="sh-bar-meta"><span style="color:${barColor}">${progressPct}% elapsed</span>${daysLeft != null ? `<span>${daysLeft}d remaining</span>` : ''}</div>
+      </div>
+      <div class="sh-stat">
+        <div class="sh-stat-val" style="color:${down ? 'var(--ember)' : 'var(--circuit)'}">${esc(s.totalShipped)}</div>
+        <div class="sh-stat-lbl">shipped</div>
+        <div class="sh-stat-trend" style="color:${down ? 'var(--ember)' : 'var(--circuit)'}">${down ? '↓' : '↑'} ${esc(s.trend)} vs last</div>
+      </div>
+      <div class="sh-stat">
+        <div class="sh-stat-val" style="color:${s.activeBlockers > 0 ? 'var(--ember)' : 'var(--circuit)'}">${esc(s.activeBlockers)}</div>
+        <div class="sh-stat-lbl">blockers</div>
+        <div class="sh-stat-trend" style="color:${s.blockersPastSla > 0 ? 'var(--ember)' : 'var(--silver)'}">${s.blockersPastSla} past SLA</div>
+      </div>
+      <div class="sh-stat">
+        <div class="sh-stat-val" style="color:var(--amber)">${esc(s.infraAvgResponse)}h</div>
+        <div class="sh-stat-lbl">infra avg</div>
+        <div class="sh-stat-trend">${slaStatus}</div>
+      </div>
+    </div>
+    <div class="sh-teams">${teamBars}</div>
+  </div>`
+}
+
 // Business ↔ Tech Bridge — translates engineering health into business-language outcomes.
 // Each team card shows: business domain + goal + impact statement + key KPIs.
 // Leadership sees risk and momentum in terms they care about, not ticket counts.
@@ -466,6 +533,7 @@ function leadershipBody(snap) {
   return `<div class="dash-body">
     <div class="section-label">Company initiatives — leadership health check</div>
     ${leadershipRollup(L, snap)}
+    ${sprintHealth(snap)}
     ${businessBridge(snap)}
     ${strategicPending(L)}
     <div class="section-label lead-table-head" style="margin-top:8px">All initiatives ${filterControls(snap)}</div>
@@ -481,6 +549,7 @@ function wireLeadership(snap) {
   }
   dashEl.querySelectorAll('.lead-chip').forEach((c) => c.addEventListener('click', () => { leadFilter.kind = c.dataset.kind; remount() }))
   document.getElementById('leadTeamSelect')?.addEventListener('change', (e) => { leadFilter.team = e.target.value; remount() })
+  document.getElementById('leadSearch')?.addEventListener('input', (e) => { leadSearch = e.target.value; remount(); document.getElementById('leadSearch')?.focus() })
 }
 
 // Hidden easter egg — revealed only by clicking the hex logo in the header.
