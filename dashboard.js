@@ -35,6 +35,24 @@ const DEP_LABELS = ['lox', 'pmx', 'uwx', 'akx', 'lgx']
 const labelClass = (l) => DEP_LABELS.includes(String(l).toLowerCase()) ? String(l).toLowerCase() : 'generic'
 
 const healthColorVar = (t) => t.health === 'healthy' ? 'var(--circuit)' : t.health === 'blocked' ? 'var(--ember)' : 'var(--amber)'
+
+// The signature "hive cell": a glowing RAG hexagon that leads each initiative.
+// status → color: on-track green · at-risk amber · blocked/overdue red.
+const ragColor = (status) =>
+  status === 'on-track' || status === 'healthy' || status === 'done' ? 'var(--circuit)'
+  : status === 'blocked' || status === 'overdue' ? 'var(--ember)' : 'var(--amber)'
+function hexCell(status, size = 18) {
+  const c = ragColor(status)
+  return `<span class="hexcell ${status === 'blocked' ? 'hx-pulse' : ''}" style="--hx:${c}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7Z" stroke="${c}" stroke-width="2" fill="${c}" fill-opacity="0.14" stroke-linejoin="round"/></svg></span>`
+}
+
+// "LO2026.06.29 · ends Jun 29" — compact active-sprint label.
+function sprintLabel(s) {
+  if (!s || !s.name) return ''
+  const end = s.endDate ? new Date(s.endDate) : null
+  const ends = end && !isNaN(end) ? ` · ends ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''
+  return `${s.name}${ends}`
+}
 function healthPill(t) {
   if (t.health === 'healthy') return { cls: 'hp-green', label: '🟢 Healthy' }
   if (t.health === 'blocked') return { cls: 'hp-red', label: '🔴 Blocked' }
@@ -122,6 +140,7 @@ function teamCard(t, snap) {
       <div><div class="tc-name">${esc(t.name)}</div><div class="tc-board t-mono">${esc(t.board)}</div></div>
       <span class="health-pill ${pill.cls}">${pill.label}</span>
     </div>
+    ${t.activeSprint ? `<div class="tc-sprint t-mono">⬡ ${esc(sprintLabel(t.activeSprint))}</div>` : ''}
     <div class="health-meter">
       <div class="hm-head"><span class="hm-label">AI Health</span><span class="hm-score">${esc(t.healthScore)}<span>/100</span></span></div>
       <div class="hm-track"><div class="hm-fill" style="width:${pct(t.healthScore)}%;background:${color}"></div></div>
@@ -180,7 +199,7 @@ function initiativeRow(i, snap) {
   const color = i.status === 'on-track' ? 'var(--circuit)' : i.status === 'at-risk' ? 'var(--amber)' : 'var(--ember)'
   const team = snap.teams.find((t) => t.id === i.teamId)
   return `<div class="init-row">
-    <div class="init-head"><div><span class="init-name">${esc(i.name)}</span> <span class="init-team">${esc(team?.shortName || i.teamId)}</span></div><span class="init-pct" style="color:${color}">${esc(i.progressPct)}%</span></div>
+    <div class="init-head"><div class="init-headline">${hexCell(i.status, 15)}<span class="init-name">${esc(i.name)}</span> <span class="init-team">${esc(team?.shortName || i.teamId)}</span></div><span class="init-pct" style="color:${color}">${esc(i.progressPct)}%</span></div>
     <div class="init-bar-wrap"><div class="init-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
     <div class="init-meta"><span>${esc(i.doneChildren)}/${esc(i.totalChildren)} done${i.blockedChildren ? ` · ${esc(i.blockedChildren)} blocked` : ''}</span><span class="init-status ${esc(i.status)}">${esc(String(i.status).replace('-', ' '))}</span></div>
   </div>`
@@ -275,17 +294,32 @@ function filteredInitiatives(snap) {
     .sort((a, b) => (rank[a.status] - rank[b.status]) || (b.progressPct - a.progressPct))
 }
 
+function storyDetailRow(i) {
+  const stories = i.stories || []
+  if (!stories.length) return `<td colspan="8"><div class="story-empty">No linked stories — add child issues in Jira.</div></td>`
+  const items = stories.map((s) => {
+    const st = s.done ? 'done' : s.blocked ? 'blocked' : 'on-track'
+    return `<div class="story-row">
+      ${hexCell(st, 13)}
+      <span class="story-id">${esc(s.id)}</span>
+      <span class="story-title ${s.done ? 'is-done' : ''}">${esc(s.title)}</span>
+      <span class="story-stage">${esc(s.stage)}${s.blocked ? ' · blocked' : ''}</span>
+    </div>`
+  }).join('')
+  return `<td colspan="8"><div class="story-list">${items}</div></td>`
+}
+
 function initiativeTable(snap) {
   const rows = filteredInitiatives(snap)
   if (!rows.length) return `<div class="card"><div class="empty-note">No initiatives match this filter.</div></div>`
-  const body = rows.map((i, idx) => {
+  const body = rows.map((i) => {
     const team = snap.teams.find((t) => t.id === i.teamId)
     const color = statusColor(i.status)
     const kindBadge = (i.kind || 'tech') === 'ops'
       ? `<span class="kind-badge ops">Ops</span>`
       : `<span class="kind-badge tech">Tech</span>`
-    return `<tr>
-      <td class="it-num">${idx + 1}</td>
+    return `<tr class="it-row" data-init="${esc(i.id)}" tabindex="0">
+      <td class="it-hex">${hexCell(i.status)}</td>
       <td class="it-name">${esc(i.name)}<span class="it-id">${esc(i.id)}</span></td>
       <td>${esc(team?.shortName || i.teamId)}</td>
       <td>${kindBadge}</td>
@@ -295,10 +329,12 @@ function initiativeTable(snap) {
       </td>
       <td class="it-stories">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? ` <span style="color:var(--ember)">· ${esc(i.blockedChildren)}⛔</span>` : ''}</td>
       <td><span class="it-status" style="color:${color}">${esc(String(i.status).replace('-', ' '))}</span></td>
-    </tr>`
+      <td class="it-chev"><span class="it-chevron">▸</span></td>
+    </tr>
+    <tr class="it-detail" data-detail="${esc(i.id)}" hidden>${storyDetailRow(i)}</tr>`
   }).join('')
   return `<div class="card lead-table-card"><table class="lead-table">
-    <thead><tr><th>#</th><th>Initiative</th><th>Team</th><th>Type</th><th>Completion</th><th>Stories</th><th>Status</th></tr></thead>
+    <thead><tr><th class="th-hex">Health</th><th>Initiative</th><th>Team</th><th>Type</th><th>Completion</th><th>Stories</th><th>Status</th><th></th></tr></thead>
     <tbody>${body}</tbody>
   </table></div>`
 }
@@ -314,12 +350,26 @@ function leadershipBody(snap) {
   </div>`
 }
 
+function wireInitiativeRows() {
+  const toggle = (row) => {
+    const detail = row.nextElementSibling
+    if (!detail || !detail.classList.contains('it-detail')) return
+    const open = detail.hidden
+    detail.hidden = !open
+    row.classList.toggle('expanded', open)
+  }
+  dashEl.querySelectorAll('.it-row').forEach((row) => {
+    row.addEventListener('click', () => toggle(row))
+    row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(row) } })
+  })
+}
 function wireLeadership(snap) {
   const remount = () => {
     const mount = document.getElementById('leadTableMount')
     if (mount) mount.innerHTML = initiativeTable(snap)
     // re-sync chip active states
     dashEl.querySelectorAll('.lead-chip').forEach((c) => c.classList.toggle('active', c.dataset.kind === leadFilter.kind))
+    wireInitiativeRows()
   }
   dashEl.querySelectorAll('.lead-chip').forEach((c) => c.addEventListener('click', () => {
     leadFilter.kind = c.dataset.kind; remount()
@@ -327,6 +377,7 @@ function wireLeadership(snap) {
   document.getElementById('leadTeamSelect')?.addEventListener('change', (e) => {
     leadFilter.team = e.target.value; remount()
   })
+  wireInitiativeRows()
 }
 
 // Hidden easter egg — revealed only by clicking the hex logo in the header.
@@ -423,6 +474,7 @@ function detailPanel(t, snap) {
     </div>
     <div>
       <span class="person-chip"><span class="pc-role">PM:</span><span class="pc-name">${esc(t.pm)}</span></span>
+      ${t.activeSprint ? `<span class="person-chip sprint-chip"><span class="pc-role">Sprint:</span><span class="pc-name">${esc(sprintLabel(t.activeSprint))}</span></span>` : ''}
       ${(t.systems || []).map((s) => `<span class="person-chip"><span class="pc-name">${esc(s)}</span></span>`).join('')}
     </div>
     ${whyBox(t)}

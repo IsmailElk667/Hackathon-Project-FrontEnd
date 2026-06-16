@@ -301,6 +301,35 @@
 .kind-badge.tech { background: rgba(59,130,246,.14); color: var(--blue); }
 .kind-badge.ops { background: rgba(139,92,246,.16); color: var(--purple); }
 
+/* ─── HIVE HEXAGON STATUS CELL (the signature "hive cell") ─── */
+.hexcell { display: inline-flex; align-items: center; justify-content: center; line-height: 0; vertical-align: middle; filter: drop-shadow(0 0 4px var(--hx)); }
+.hexcell.hx-pulse { animation: hexPulse 2.4s ease-in-out infinite; }
+@keyframes hexPulse { 0%,100% { filter: drop-shadow(0 0 3px var(--hx)); } 50% { filter: drop-shadow(0 0 9px var(--hx)); } }
+
+/* ─── TEAM CARD: active sprint chip ─── */
+.tc-sprint { margin-top: 8px; font-size: 10.5px; color: var(--silver); letter-spacing: -0.01em; }
+.sprint-chip .pc-role { color: var(--amber); }
+
+/* ─── INITIATIVE ROW headline with hexagon ─── */
+.init-headline { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ─── LEADERSHIP TABLE: hexagon lead + expandable story rows ─── */
+.lead-table .th-hex { width: 56px; }
+.it-hex { width: 56px; text-align: center; }
+.it-row { cursor: pointer; }
+.it-row .it-chevron { color: var(--silver); font-size: 11px; display: inline-block; transition: transform .15s; }
+.it-row.expanded .it-chevron { transform: rotate(90deg); color: var(--amber); }
+.it-chev { width: 28px; text-align: center; }
+.it-detail > td { padding: 0 14px 12px 56px; background: var(--surface-inset, rgba(0,0,0,.15)); }
+.story-list { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+.story-row { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 4px; font-size: 12px; }
+.story-row:hover { background: rgba(245,166,35,.04); }
+.story-id { font-family: var(--mono); font-size: 10.5px; color: var(--amber); flex-shrink: 0; min-width: 78px; }
+.story-title { color: var(--paper); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story-title.is-done { color: var(--silver); text-decoration: line-through; text-decoration-color: rgba(139,143,168,.5); }
+.story-stage { font-family: var(--mono); font-size: 10px; color: var(--silver); flex-shrink: 0; }
+.story-empty { padding: 10px 0 14px; font-size: 11.5px; color: var(--silver); }
+
 /* ─── DIVIDER ─── */
 .section-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 
