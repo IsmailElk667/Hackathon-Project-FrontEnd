@@ -309,30 +309,53 @@ function storyDetailRow(i) {
   return `<td colspan="8"><div class="story-list">${items}</div></td>`
 }
 
+function initiativeTableRow(i, snap) {
+  const team = snap.teams.find((t) => t.id === i.teamId)
+  const color = statusColor(i.status)
+  const kindBadge = (i.kind || 'tech') === 'ops'
+    ? `<span class="kind-badge ops">Ops</span>`
+    : `<span class="kind-badge tech">Tech</span>`
+  return `<tr class="it-row" data-init="${esc(i.id)}" tabindex="0">
+    <td class="it-hex">${hexCell(i.status)}</td>
+    <td class="it-name">${esc(i.name)}<span class="it-id">${esc(i.id)}</span></td>
+    <td>${esc(team?.shortName || i.teamId)}</td>
+    <td>${kindBadge}</td>
+    <td class="it-prog">
+      <div class="it-bar-wrap"><div class="it-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
+      <span class="it-pct" style="color:${color}">${esc(i.progressPct)}%</span>
+    </td>
+    <td class="it-stories">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? ` <span style="color:var(--ember)">· ${esc(i.blockedChildren)}⛔</span>` : ''}</td>
+    <td><span class="it-status" style="color:${color}">${esc(String(i.status).replace('-', ' '))}</span></td>
+    <td class="it-chev"><span class="it-chevron">▸</span></td>
+  </tr>
+  <tr class="it-detail" data-detail="${esc(i.id)}" hidden>${storyDetailRow(i)}</tr>`
+}
+
 function initiativeTable(snap) {
   const rows = filteredInitiatives(snap)
   if (!rows.length) return `<div class="card"><div class="empty-note">No initiatives match this filter.</div></div>`
-  const body = rows.map((i) => {
-    const team = snap.teams.find((t) => t.id === i.teamId)
-    const color = statusColor(i.status)
-    const kindBadge = (i.kind || 'tech') === 'ops'
-      ? `<span class="kind-badge ops">Ops</span>`
-      : `<span class="kind-badge tech">Tech</span>`
-    return `<tr class="it-row" data-init="${esc(i.id)}" tabindex="0">
-      <td class="it-hex">${hexCell(i.status)}</td>
-      <td class="it-name">${esc(i.name)}<span class="it-id">${esc(i.id)}</span></td>
-      <td>${esc(team?.shortName || i.teamId)}</td>
-      <td>${kindBadge}</td>
-      <td class="it-prog">
-        <div class="it-bar-wrap"><div class="it-bar" style="width:${pct(i.progressPct)}%;background:${color}"></div></div>
-        <span class="it-pct" style="color:${color}">${esc(i.progressPct)}%</span>
-      </td>
-      <td class="it-stories">${esc(i.doneChildren)}/${esc(i.totalChildren)}${i.blockedChildren ? ` <span style="color:var(--ember)">· ${esc(i.blockedChildren)}⛔</span>` : ''}</td>
-      <td><span class="it-status" style="color:${color}">${esc(String(i.status).replace('-', ' '))}</span></td>
-      <td class="it-chev"><span class="it-chevron">▸</span></td>
-    </tr>
-    <tr class="it-detail" data-detail="${esc(i.id)}" hidden>${storyDetailRow(i)}</tr>`
+
+  // Group by team (in team-list order); rows within a team keep the blocked-first
+  // sort from filteredInitiatives. A team sub-header leads each group.
+  const order = snap.teams.map((t) => t.id)
+  const byTeam = new Map()
+  for (const i of rows) {
+    if (!byTeam.has(i.teamId)) byTeam.set(i.teamId, [])
+    byTeam.get(i.teamId).push(i)
+  }
+  const teamIds = [...byTeam.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+
+  const body = teamIds.map((tid) => {
+    const team = snap.teams.find((t) => t.id === tid)
+    const items = byTeam.get(tid)
+    const blocked = items.filter((i) => i.status === 'blocked').length
+    const atRisk = items.filter((i) => i.status === 'at-risk').length
+    const flag = blocked ? `<span class="grp-flag red">${blocked} blocked</span>`
+      : atRisk ? `<span class="grp-flag amber">${atRisk} at risk</span>` : ''
+    const header = `<tr class="it-group"><td colspan="8"><span class="itg-name">${esc(team?.name || tid)}</span><span class="itg-count">${items.length}</span>${flag}</td></tr>`
+    return header + items.map((i) => initiativeTableRow(i, snap)).join('')
   }).join('')
+
   return `<div class="card lead-table-card"><table class="lead-table">
     <thead><tr><th class="th-hex">Health</th><th>Initiative</th><th>Team</th><th>Type</th><th>Completion</th><th>Stories</th><th>Status</th><th></th></tr></thead>
     <tbody>${body}</tbody>

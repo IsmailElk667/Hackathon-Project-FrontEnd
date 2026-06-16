@@ -301,6 +301,13 @@
 .kind-badge.tech { background: rgba(59,130,246,.14); color: var(--blue); }
 .kind-badge.ops { background: rgba(139,92,246,.16); color: var(--purple); }
 
+/* ─── LEADERSHIP TABLE: per-team group header rows ─── */
+.it-group > td { padding: 12px 14px 7px; border-bottom: 1px solid var(--border2); background: rgba(255,255,255,.02); }
+.it-group:not(:first-child) > td { padding-top: 20px; }
+.itg-name { font-size: 13px; font-weight: 700; color: var(--paper); }
+.itg-count { font-family: var(--mono); font-size: 10px; color: var(--silver); background: var(--graphite); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; margin-left: 8px; }
+.it-group .grp-flag { margin-left: 8px; }
+
 /* ─── HIVE HEXAGON STATUS CELL (the signature "hive cell") ─── */
 .hexcell { display: inline-flex; align-items: center; justify-content: center; line-height: 0; vertical-align: middle; filter: drop-shadow(0 0 4px var(--hx)); }
 .hexcell.hx-pulse { animation: hexPulse 2.4s ease-in-out infinite; }
