@@ -97,7 +97,6 @@
 .team-card.blocked-glow { animation: pulseGlow 3s ease-in-out infinite; }
 .tc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
 .tc-name { font-size: 13px; font-weight: 700; color: var(--paper); }
-.tc-board { font-family: var(--mono); font-size: 10px; color: var(--silver); margin-top: 2px; }
 .health-pill { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
 .hp-green  { background: rgba(34,197,94,.12); color: var(--circuit); }
 .hp-yellow { background: rgba(245,166,35,.12); color: var(--amber); }
@@ -149,8 +148,7 @@
 .bu-leg-line.scope { border-color: #F97316; }
 .bu-leg-line.ideal { border-top-style: dashed; border-color: rgba(139,143,168,.7); }
 
-/* Cycle-time — compact strip on the card + full panel in the detail overlay */
-.cycle-strip { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+/* Cycle-time — full panel in the detail overlay */
 .cycle-panel { margin: 14px 0; }
 .cy-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .cy-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--paper); }

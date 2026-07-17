@@ -334,13 +334,6 @@ function cyTiles(c) {
 }
 const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">days in flight</span></div>`
 
-// Compact strip for the team card (just the three stat tiles).
-function cycleStrip(t) {
-  const c = cycleStats(t)
-  if (!c) return ''
-  return `<div class="cycle-strip">${cyHead()}${cyTiles(c)}</div>`
-}
-
 // Full panel for the detail overlay (stats + top-5 longest-running tickets).
 function cyclePanel(t) {
   const c = cycleStats(t)
@@ -370,18 +363,20 @@ function teamCard(t, snap) {
   const blockerCount = isInfra ? (snap.infraBlockers?.length || 0) : (t.blockers?.length || 0)
   const badge = blockerCount
   const badgeStyle = ''
-  // Uniform metric set across ALL teams · shipped · in-flight · stalled · blockers.
+  // Uniform flow-metric set across ALL teams · Cycle time · WIP · Throughput · Blockers.
+  // Cycle time (avg days in flight) is surfaced here instead of a separate strip.
+  const cyc = cycleStats(t)
   const stats = [
-    [t.shipped, 'shipped', ''],
-    [t.inFlight, 'in-flight', ''],
-    [t.stalled, 'stalled', t.stalled > 0 ? 'var(--ember)' : ''],
-    [blockerCount, 'blockers', blockerCount > 0 ? 'var(--ember)' : ''],
+    [cyc ? `${cyc.avg}d` : '—', 'Cycle time', ''],
+    [t.inFlight, 'WIP', ''],
+    [t.shipped, 'Throughput', ''],
+    [blockerCount, 'Blockers', blockerCount > 0 ? 'var(--ember)' : ''],
   ]
   return `
   <div class="team-card ${t.health === 'blocked' ? 'blocked-glow' : ''}" data-team="${esc(t.id)}" role="button" tabindex="0">
     ${badge > 0 ? `<div class="blocker-badge"${badgeStyle}>${badge}</div>` : ''}
     <div class="tc-top">
-      <div><div class="tc-name">${esc(t.name)}</div><div class="tc-board t-mono">${esc(t.board)}</div></div>
+      <div><div class="tc-name">${esc(t.name)}</div></div>
       <span class="health-pill ${pill.cls}">${pill.label}</span>
     </div>
     ${t.activeSprint ? `<div class="tc-sprint t-mono">⬡ ${esc(sprintLabel(t.activeSprint))}</div>` : ''}
@@ -391,7 +386,6 @@ function teamCard(t, snap) {
     </div>
     ${queueDepthRow(t)}
     ${burnUp(t)}
-    ${cycleStrip(t)}
   </div>`
 }
 
