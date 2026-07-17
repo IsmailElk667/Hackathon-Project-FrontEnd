@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    HIVE PULSE — Live Dashboard (scroll-experience destination)
    Ported from hive-pulse.html (the visual spec) but 100% data-bound via
-   dashboard.js. Everything is scoped under .dashboard / .pulse-ticker /
-   .detail-overlay so it never touches the 3D scroll panels above.
+   dashboard.js. Everything is scoped under .dashboard / .detail-overlay
+   so it never touches the 3D scroll panels above.
 ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -32,7 +32,7 @@
   color: var(--paper);
   font-size: 15px;
   line-height: 1.6;
-  padding: 64px 0 84px;        /* bottom space for the fixed ticker */
+  padding: 64px 0 48px;
   border-top: 1px solid var(--border);
   box-shadow: 0 -40px 80px rgba(0,0,0,.6);
 }
@@ -439,18 +439,6 @@
 /* ─── DIVIDER ─── */
 .section-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 
-/* ─── FIXED TICKER ─── */
-.pulse-ticker { position: fixed; bottom: 0; left: 0; right: 0; height: 40px; background: rgba(12,13,15,.96); border-top: 1px solid var(--border); overflow: hidden; z-index: 550; display: flex; align-items: center; backdrop-filter: blur(12px); }
-.pulse-ticker[hidden] { display: none; }
-.ticker-label { flex-shrink: 0; padding: 0 16px; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--amber); border-right: 1px solid var(--border); height: 100%; display: flex; align-items: center; gap: 7px; background: rgba(245,166,35,.04); }
-.ticker-wrap { flex: 1; overflow: hidden; }
-.ticker-track { display: flex; width: max-content; animation: marquee 80s linear infinite; }
-.ticker-content { font-family: var(--mono); font-size: 11px; color: var(--silver); white-space: nowrap; padding-right: 60px; }
-.t-alert { color: var(--ember); font-weight: 600; }
-.t-good  { color: var(--circuit); font-weight: 600; }
-.t-id    { color: var(--amber); }
-.t-dim   { color: rgba(139,143,168,.4); }
-
 /* ─── BACK TO TOP ─── */
 .back-top { position: fixed; right: 22px; bottom: 56px; z-index: 560; background: var(--amber); color: var(--graphite); border: none; font-family: var(--sans); font-weight: 700; font-size: 13px; padding: 10px 16px; border-radius: 9px; cursor: pointer; box-shadow: 0 4px 20px var(--amber-glow); transition: transform .2s, box-shadow .2s; }
 .back-top[hidden] { display: none; }
@@ -458,7 +446,6 @@
 
 /* ─── ANIMATIONS ─── */
 @keyframes pulse     { 0%,100% { opacity:1; } 50% { opacity:.4; } }
-@keyframes marquee   { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
 @keyframes pulseGlow { 0%,100% { box-shadow:0 0 0 rgba(239,68,68,0); } 50% { box-shadow:0 0 18px rgba(239,68,68,.25); } }
 
 /* ─── LEADERSHIP: collapsible initiative groups ─── */
@@ -556,10 +543,6 @@
 .ti-id a:hover, .story-id a:hover, .b-id a:hover {
   color: var(--amber); border-bottom-color: var(--amber);
 }
-/* Ticker links — stay the same amber colour as plain IDs but underline on hover */
-a.t-link { color: var(--amber); text-decoration: none; }
-a.t-link:hover { text-decoration: underline; }
-
 /* ─── HEALTH SUBTITLE — plain-English one-liner under the meter bar ─── */
 .hm-subtitle { font-size: 10.5px; color: var(--silver); margin-top: 5px; line-height: 1.3; }
 
@@ -675,7 +658,7 @@ a.t-link:hover { text-decoration: underline; }
 @media (max-width:900px)  { .exec-grid { grid-template-columns: repeat(2,1fr); } .two-col { grid-template-columns: 1fr; } .detail-grid { grid-template-columns: 1fr; } .dash-body { padding: 20px; } .dash-header { padding: 0 20px 18px; } }
 @media (max-width:980px)  { .sp-hero { grid-template-columns: 1fr; } .sp-board { grid-template-columns: repeat(2,1fr); } .br-grid { grid-template-columns: 1fr; } }
 @media (max-width:600px)  { .exec-grid { grid-template-columns: 1fr; } .metrics-row { grid-template-columns: 1fr 1fr; } .sp-board { grid-template-columns: 1fr; } .sp-stats { grid-template-columns: repeat(2,1fr); } }
-@media (prefers-reduced-motion:reduce) { .ticker-track { animation: none; } .team-card.blocked-glow { animation: none; } .live-dot { animation: none; } .dashboard.revealing { animation: none; } .es-caret { animation: none; } .hexcell.hx-pulse { animation: none; } }
+@media (prefers-reduced-motion:reduce) { .team-card.blocked-glow { animation: none; } .live-dot { animation: none; } .dashboard.revealing { animation: none; } .es-caret { animation: none; } .hexcell.hx-pulse { animation: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THEME SYSTEM — three visual skins of the SAME layout (visual re-skin only).
@@ -686,7 +669,6 @@ a.t-link:hover { text-decoration: underline; }
 
 /* ─── LIGHT ─── warm-paper surfaces, dark ink, gold accent kept ─── */
 body[data-theme="light"] .dashboard,
-body[data-theme="light"] .pulse-ticker,
 body[data-theme="light"] .detail-overlay,
 body[data-theme="light"] .back-top {
   --graphite:  #EFEDE7;   /* app ground (warm paper) */
@@ -705,7 +687,6 @@ body[data-theme="light"] .back-top {
   --amber-glow: rgba(184,117,3,.18);
 }
 body[data-theme="light"] .dashboard { box-shadow: 0 -40px 80px rgba(0,0,0,.12); }
-body[data-theme="light"] .pulse-ticker { background: rgba(255,255,255,.94); }
 body[data-theme="light"] .detail-overlay { background: rgba(20,20,30,.4); }
 /* tinted pill fills assume a dark bg; lift them for light mode legibility */
 body[data-theme="light"] .hp-green  { background: rgba(21,128,61,.12); }
@@ -716,7 +697,6 @@ body[data-theme="light"] .demo-pill.jira { background: rgba(21,128,61,.12); }
 
 /* ─── CLAUDE-SOFT ─── kit's violet-tinted ground, rounded soft cards, gold accent ─── */
 body[data-theme="claude"] .dashboard,
-body[data-theme="claude"] .pulse-ticker,
 body[data-theme="claude"] .detail-overlay,
 body[data-theme="claude"] .back-top {
   --graphite:  #0A0A14;   /* kit bg-base (near-black, violet undertone) */

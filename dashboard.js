@@ -20,7 +20,6 @@ const jiraLink = (id, cls = '') =>
 
 // ── Mount points (declared in index.html) ────────────────────────────────────
 const dashEl    = document.getElementById('dashboard')
-const tickerEl  = document.getElementById('pulse-ticker')
 const overlayEl = document.getElementById('detail-overlay')
 const ctaEl     = document.querySelector('.cta')
 const skipEl    = document.getElementById('skipBtn')
@@ -122,12 +121,11 @@ function hexCell(status, size = 18) {
   return `<span class="hexcell ${status === 'blocked' ? 'hx-pulse' : ''}" style="--hx:${c}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7Z" stroke="${c}" stroke-width="2" fill="${c}" fill-opacity="0.14" stroke-linejoin="round"/></svg></span>`
 }
 
-// "LO2026.06.29 · ends Jun 29" · compact active-sprint label.
+// "LO2026.06.29" · compact active-sprint label. The sprint name already
+// encodes the end date, so no separate "· ends <date>" suffix is appended.
 function sprintLabel(s) {
   if (!s || !s.name) return ''
-  const end = s.endDate ? new Date(s.endDate) : null
-  const ends = end && !isNaN(end) ? ` · ends ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''
-  return `${s.name}${ends}`
+  return `${s.name}`
 }
 function healthPill(t) {
   if (t.health === 'healthy') return { cls: 'hp-green', label: '🟢 Healthy' }
@@ -330,7 +328,9 @@ function cycleStats(t) {
 }
 const cyTile = (v, l, col) => `<div class="cy-tile"><div class="cy-val" style="color:${col}">${v}<span>d</span></div><div class="cy-lbl">${l}</div></div>`
 function cyTiles(c) {
-  return `<div class="cy-tiles">${cyTile(c.avg, 'AVG', '#3B82F6')}${cyTile(c.median, 'MEDIAN', '#A855F7')}${cyTile(c.max, 'MAX', '#F97316')}</div>`
+  // All three stats rendered in white (var(--paper)) — the coloured
+  // blue/purple/orange treatment was noisy and read as unrelated categories.
+  return `<div class="cy-tiles">${cyTile(c.avg, 'AVG', 'var(--paper)')}${cyTile(c.median, 'MEDIAN', 'var(--paper)')}${cyTile(c.max, 'MAX', 'var(--paper)')}</div>`
 }
 const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">days in flight</span></div>`
 
@@ -395,14 +395,14 @@ function teamCard(t, snap) {
   </div>`
 }
 
-// Hand-off queue depth chips on a team card (Code Review / QA Done / Ready).
+// Hand-off queue depth chips on a team card (QA Done / Ready).
 function queueDepthRow(t) {
   const q = t.queueDepth
   if (!q || q.total === 0) return ''
   const items = []
-  if (q.codeReview)    items.push([q.codeReview, 'in review',  q.hottest === 'codeReview'])
   if (q.qaDone)        items.push([q.qaDone,      'QA done',    q.hottest === 'qaDone'])
   if (q.readyToDeploy) items.push([q.readyToDeploy, 'ready',    q.hottest === 'readyToDeploy'])
+  if (!items.length) return ''
   return `<div class="tc-queue">${items.map(([n, l, hot]) =>
     `<span class="tq-item${hot ? ' tq-hot' : ''}">${n} ${l}</span>`).join('')}</div>`
 }
@@ -1375,21 +1375,7 @@ function openDetail(teamId) {
 }
 function closeDetail() { overlayEl.classList.remove('open') }
 
-// ── Ticker ────────────────────────────────────────────────────────────────────
-function decorate(line) {
-  // esc() first, then re-insert Jira links (IDs are [A-Z]{2,5}-\d+, safe from HTML escaping)
-  let s = esc(line).replace(/\b([A-Z]{2,5}-\d+)\b/g,
-    `<a href="${JIRA_BASE}/browse/$1" target="_blank" rel="noopener noreferrer" class="t-id t-link">$1</a>`)
-  if (/exceeds SLA|past SLA|BLOCKED|breached|escalat/i.test(line)) return `<span class="t-alert">${s}</span>`
-  if (/shipped|success rate|leads|on-track|down 0|↓/i.test(line)) return `<span class="t-good">${s}</span>`
-  return s
-}
-function renderTicker(snap) {
-  const content = snap.ticker.map((l) => `<span class="t-dim"> · </span>${decorate(l)}`).join('') + '<span class="t-dim"> · </span>'
-  tickerEl.innerHTML = `<div class="ticker-label"><span class="live-dot"></span>Live Feed</div><div class="ticker-wrap"><div class="ticker-track"><span class="ticker-content">${content}</span><span class="ticker-content" aria-hidden="true">${content}</span></div></div>`
-}
-
-// ── Master render (hash-guarded so the ticker doesn't reset on no-op pushes) ──
+// ── Master render ─────────────────────────────────────────────────────────────
 function teamBody(snap) {
   return `<div class="dash-body">`
     + narrative(snap)
@@ -1418,7 +1404,6 @@ function render(snap) {
   document.getElementById('dashRefresh')?.addEventListener('click', manualRefresh)
   document.getElementById('themeToggle')?.addEventListener('click', cycleTheme)
   document.getElementById('agentEgg')?.addEventListener('click', openAgents)
-  renderTicker(snap)
 }
 
 function showError(msg) {
@@ -1519,7 +1504,6 @@ function reveal({ scroll = true } = {}) {
   if (skipEl) skipEl.hidden = true   // hide skip button once dashboard is revealed
   dashEl.hidden = false
   dashEl.classList.add('revealing')
-  tickerEl.hidden = false
   // If the scroll landing is ever restored, let GSAP ScrollTrigger recalc.
   window.dispatchEvent(new Event('resize'))
   if (scroll) requestAnimationFrame(() => dashEl.scrollIntoView({ behavior: 'smooth' }))
