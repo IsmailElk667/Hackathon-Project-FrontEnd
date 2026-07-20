@@ -319,15 +319,16 @@ function burnUp(t) {
     }
     return d
   }
-  const dots = (key, cls) => pts.map((p) => `<circle cx="${X(p.ms).toFixed(1)}" cy="${Y(p[key]).toFixed(1)}" r="2.1" class="${cls}"/>`).join('')
-
   const mid = Math.round(yMax / 2)
   const yticks = [0, mid, yMax].map((v) => `<text x="${PL - 5}" y="${(Y(v) + 3).toFixed(1)}" class="bu-ytick" text-anchor="end">${v}</text>`).join('')
   const fmt = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const midMs = startMs + span / 2
   const xticks = [[startMs, 'start'], [midMs, 'mid'], [endMs, 'end']].map(([ms], i) =>
     `<text x="${X(ms).toFixed(1)}" y="${PB + 14}" class="bu-xtick" text-anchor="${i === 0 ? 'start' : i === 2 ? 'end' : 'middle'}">${esc(fmt(ms))}</text>`).join('')
-  const tx = clamp(X(todayMs), PL + 12, PR - 12)
+  // Done end-dot + callout pill at Today — the original chart's signature.
+  const dx = X(todayMs), dy = Y(finalDone)
+  const cyv = Math.max(PT + 2, dy - 22)
+  const tx = clamp(dx, PL + 14, PR - 14)
 
   return `<div class="burn-up">
     <div class="bu-head"><span class="bu-title">BURN-UP</span><span class="bu-sub">${esc(finalDone)} of ${esc(finalScope)} issues</span></div>
@@ -335,17 +336,19 @@ function burnUp(t) {
       ${yticks}${xticks}
       <line x1="${PL}" y1="${PB}" x2="${PR}" y2="${PB}" class="bu-axis"/>
       <line x1="${X(startMs).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(endMs).toFixed(1)}" y2="${Y(finalScope).toFixed(1)}" class="bu-ideal"/>
-      <line x1="${X(todayMs).toFixed(1)}" y1="${Y(finalScope).toFixed(1)}" x2="${X(endMs).toFixed(1)}" y2="${Y(finalScope).toFixed(1)}" class="bu-proj"/>
       <line x1="${X(todayMs).toFixed(1)}" y1="${PT}" x2="${X(todayMs).toFixed(1)}" y2="${PB}" class="bu-today"/>
       <text x="${tx.toFixed(1)}" y="${PT - 4}" class="bu-today-lbl" text-anchor="middle">Today</text>
       <path d="${step('scope')}" class="bu-scope-line" fill="none"/>
-      <path d="${step('done')}" class="bu-done-line" fill="none"/>
-      ${dots('scope', 'bu-scope-dot')}${dots('done', 'bu-done-dot')}
+      <path d="${step('done')}" class="bu-done" fill="none"/>
+      <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.6" class="bu-dot"/>
+      <g transform="translate(${tx.toFixed(1)},${cyv.toFixed(1)})">
+        <rect x="-23" y="0" width="46" height="17" rx="8.5" class="bu-callout-bg"/>
+        <text x="0" y="12" text-anchor="middle" class="bu-callout-tx">${esc(finalDone)}/${esc(finalScope)}</text>
+      </g>
     </svg>
     <div class="bu-legend">
+      <span class="bu-leg"><i class="bu-leg-dot"></i>Completed</span>
       <span class="bu-leg"><i class="bu-leg-line scope"></i>Work scope</span>
-      <span class="bu-leg"><i class="bu-leg-line proj"></i>Projection</span>
-      <span class="bu-leg"><i class="bu-leg-line done"></i>Completed</span>
       <span class="bu-leg"><i class="bu-leg-line ideal"></i>Guideline</span>
     </div>
   </div>`
