@@ -384,21 +384,8 @@ function teamCard(t, snap) {
     <div class="tc-stats">
       ${stats.map(([v, l, c]) => `<div class="tc-stat"><div class="tc-val"${c ? ` style="color:${c}"` : ''}>${esc(v)}</div><div class="tc-lbl">${esc(l)}</div></div>`).join('')}
     </div>
-    ${queueDepthRow(t)}
     ${burnUp(t)}
   </div>`
-}
-
-// Hand-off queue depth chips on a team card (QA Done / Ready).
-function queueDepthRow(t) {
-  const q = t.queueDepth
-  if (!q || q.total === 0) return ''
-  const items = []
-  if (q.qaDone)        items.push([q.qaDone,      'QA done',    q.hottest === 'qaDone'])
-  if (q.readyToDeploy) items.push([q.readyToDeploy, 'ready',    q.hottest === 'readyToDeploy'])
-  if (!items.length) return ''
-  return `<div class="tc-queue">${items.map(([n, l, hot]) =>
-    `<span class="tq-item${hot ? ' tq-hot' : ''}">${n} ${l}</span>`).join('')}</div>`
 }
 
 function blockersCard(snap) {

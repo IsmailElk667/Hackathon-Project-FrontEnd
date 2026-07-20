@@ -374,11 +374,6 @@
 .kind-badge.tech { background: rgba(59,130,246,.14); color: var(--blue); }
 .kind-badge.ops { background: rgba(139,92,246,.16); color: var(--purple); }
 
-/* ─── TEAM CARD: queue-depth chips ─── */
-.tc-queue { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
-.tq-item { font-family: var(--mono); font-size: 9.5px; color: var(--silver); background: var(--graphite); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; }
-.tq-item.tq-hot { color: var(--amber); border-color: rgba(245,166,35,.4); background: rgba(245,166,35,.08); }
-
 /* ─── CYCLE TIME card ─── */
 .ct-row { display: grid; grid-template-columns: 52px 1fr 54px; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .ct-row:last-child { border-bottom: none; }
