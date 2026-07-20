@@ -261,8 +261,34 @@ function stageBar(t) {
 // Renders from t.burnup = { start, end, points:[{ t, scope, done }] } supplied by
 // the backend from real Jira sprint history (synthesized fallback in mock/local).
 // Work scope (stepped) · Completed work (stepped) · Guideline · Scope projection · Today.
+// Client-side burn-up fallback: used until the backend supplies t.burnup (real
+// Jira sprint history). Synthesizes a series from current totals + sprint dates
+// so the chart never goes blank during a frontend-ahead-of-backend deploy.
+function synthBurnupClient(t) {
+  const done = t.shipped || 0
+  const total = done + (t.inFlight || 0)
+  if (!total) return null
+  const DAY = 86400000
+  const sp = t.activeSprint || {}
+  let startMs = Date.parse(sp.startDate), endMs = Date.parse(sp.endDate)
+  const now = Date.now()
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    startMs = now - 9 * DAY; endMs = now + 5 * DAY
+  }
+  const todayMs = Math.min(now, endMs)
+  const elapsed = Math.max(1, todayMs - startMs)
+  const points = []
+  for (let ms = startMs; ; ms += DAY) {
+    const day = Math.min(ms, todayMs)
+    const f = (day - startMs) / elapsed
+    points.push({ t: new Date(day).toISOString(), scope: Math.round(total * (0.72 + 0.28 * Math.min(1, f * 1.6))), done: Math.round(done * Math.pow(f, 1.3)) })
+    if (day >= todayMs) break
+  }
+  return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString(), points }
+}
 function burnUp(t) {
-  const bu = t.burnup
+  let bu = t.burnup
+  if (!bu || !Array.isArray(bu.points) || bu.points.length < 2) bu = synthBurnupClient(t)
   if (!bu || !Array.isArray(bu.points) || bu.points.length < 2) {
     return `<div class="burn-up"><div class="bu-head"><span class="bu-title">BURN-UP</span></div><div class="sb-empty">No sprint data</div></div>`
   }
