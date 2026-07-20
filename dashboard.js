@@ -257,71 +257,79 @@ function stageBar(t) {
 
 // ── Burn-up chart (per team card) ─────────────────────────────────────────────
 // Done vs Scope across the sprint's working days, plus the ideal trajectory.
-// No Jira changelog is wired yet, so the daily Done curve is MODELED from the
-// team's current totals + sprint dates (same limitation as cycle-time-by-stage).
-// The endpoint numbers (done / scope) are real.
+// Sprint burn-up — issue count (Y) vs time (X), current sprint only (no backlog).
+// Renders from t.burnup = { start, end, points:[{ t, scope, done }] } supplied by
+// the backend from real Jira sprint history (synthesized fallback in mock/local).
+// Work scope (stepped) · Completed work (stepped) · Guideline · Scope projection · Today.
 function burnUp(t) {
-  const sp = t.activeSprint || {}
-  const done = t.shipped || 0
-  // Scope = completed + in-flight. `stalled` is a SUBSET of inFlight (backend
-  // counts it within active issues), so it must NOT be added again — doing so
-  // double-counted stalled tickets and inflated the denominator. Backlog is
-  // intentionally excluded (a large "not started" backlog isn't sprint scope).
-  const scope = Math.max(done + (t.inFlight || 0), 1)
-  const TD = 10                                   // working days in a 2-week sprint
-  let frac = 0.6                                  // sprint fraction elapsed (fallback)
-  const start = sp.startDate ? new Date(sp.startDate) : null
-  const end = sp.endDate ? new Date(sp.endDate) : null
-  if (start && end && !isNaN(start) && !isNaN(end) && end > start) {
-    frac = clamp((Date.now() - start.getTime()) / (end.getTime() - start.getTime()), 0, 1)
+  const bu = t.burnup
+  if (!bu || !Array.isArray(bu.points) || bu.points.length < 2) {
+    return `<div class="burn-up"><div class="bu-head"><span class="bu-title">BURN-UP</span></div><div class="sb-empty">No sprint data</div></div>`
   }
-  const elapsed = Math.max(0.6, frac * TD)        // keep a visible curve early on
-  const yMax = Math.ceil(scope * 1.15)
-  const mid = Math.round(yMax / 2)
+  const pts = bu.points
+    .map((p) => ({ ms: Date.parse(p.t), scope: Number(p.scope) || 0, done: Number(p.done) || 0 }))
+    .filter((p) => Number.isFinite(p.ms))
+    .sort((a, b) => a.ms - b.ms)
+  if (pts.length < 2) return `<div class="burn-up"><div class="bu-head"><span class="bu-title">BURN-UP</span></div><div class="sb-empty">No sprint data</div></div>`
+
+  const startMs = Date.parse(bu.start) || pts[0].ms
+  const endMs = Math.max(Date.parse(bu.end) || pts[pts.length - 1].ms, pts[pts.length - 1].ms)
+  const span = Math.max(1, endMs - startMs)
+  const todayMs = pts[pts.length - 1].ms
+  const finalScope = pts[pts.length - 1].scope
+  const finalDone = pts[pts.length - 1].done
+  const yMax = Math.max(1, Math.ceil(Math.max(...pts.map((p) => p.scope)) * 1.15))
+
   // Plot geometry (viewBox 300×172)
-  const PL = 34, PR = 286, PT = 26, PB = 146
-  const X = (d) => PL + (d / TD) * (PR - PL)
+  const PL = 30, PR = 292, PT = 24, PB = 150
+  const X = (ms) => PL + ((ms - startMs) / span) * (PR - PL)
   const Y = (v) => PB - (v / yMax) * (PB - PT)
-  // Modeled Done curve — ease-in sampling from D0 to Today.
-  const N = 24
-  const donePath = Array.from({ length: N + 1 }, (_, i) => {
-    const d = (elapsed * i) / N
-    const v = done * Math.pow(d / (elapsed || 1), 1.6)
-    return `${X(d).toFixed(1)},${Y(v).toFixed(1)}`
-  }).join(' ')
-  const dx = X(elapsed), dy = Y(done)
-  const cy = Math.max(PT + 2, dy - 22)
-  const tx = clamp(dx, PL + 14, PR - 14)
-  const yticks = [0, mid, yMax].map((v) => `<text x="${PL - 6}" y="${(Y(v) + 3).toFixed(1)}" class="bu-ytick" text-anchor="end">${v}</text>`).join('')
-  const xticks = [0, TD / 2, TD].map((d) => `<text x="${X(d).toFixed(1)}" y="${PB + 15}" class="bu-xtick" text-anchor="middle">D${Math.round(d)}</text>`).join('')
+
+  // Step-after path — each value holds until the next daily sample.
+  const step = (key) => {
+    let d = `M ${X(pts[0].ms).toFixed(1)} ${Y(pts[0][key]).toFixed(1)}`
+    for (let i = 1; i < pts.length; i++) {
+      d += ` L ${X(pts[i].ms).toFixed(1)} ${Y(pts[i - 1][key]).toFixed(1)} L ${X(pts[i].ms).toFixed(1)} ${Y(pts[i][key]).toFixed(1)}`
+    }
+    return d
+  }
+  const dots = (key, cls) => pts.map((p) => `<circle cx="${X(p.ms).toFixed(1)}" cy="${Y(p[key]).toFixed(1)}" r="2.1" class="${cls}"/>`).join('')
+
+  const mid = Math.round(yMax / 2)
+  const yticks = [0, mid, yMax].map((v) => `<text x="${PL - 5}" y="${(Y(v) + 3).toFixed(1)}" class="bu-ytick" text-anchor="end">${v}</text>`).join('')
+  const fmt = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const midMs = startMs + span / 2
+  const xticks = [[startMs, 'start'], [midMs, 'mid'], [endMs, 'end']].map(([ms], i) =>
+    `<text x="${X(ms).toFixed(1)}" y="${PB + 14}" class="bu-xtick" text-anchor="${i === 0 ? 'start' : i === 2 ? 'end' : 'middle'}">${esc(fmt(ms))}</text>`).join('')
+  const tx = clamp(X(todayMs), PL + 12, PR - 12)
+
   return `<div class="burn-up">
-    <div class="bu-head"><span class="bu-title">BURN-UP</span><span class="bu-sub">Working Days</span></div>
-    <svg viewBox="0 0 300 172" class="bu-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Burn-up chart: ${done} done of ${scope} scope">
+    <div class="bu-head"><span class="bu-title">BURN-UP</span><span class="bu-sub">${esc(finalDone)} of ${esc(finalScope)} issues</span></div>
+    <svg viewBox="0 0 300 172" class="bu-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sprint burn-up chart: ${esc(finalDone)} of ${esc(finalScope)} issues completed">
       ${yticks}${xticks}
       <line x1="${PL}" y1="${PB}" x2="${PR}" y2="${PB}" class="bu-axis"/>
-      <line x1="${X(0)}" y1="${Y(0)}" x2="${X(TD)}" y2="${Y(scope)}" class="bu-ideal"/>
-      <line x1="${X(0)}" y1="${Y(scope)}" x2="${X(TD)}" y2="${Y(scope)}" class="bu-scope"/>
-      <line x1="${dx.toFixed(1)}" y1="${PT}" x2="${dx.toFixed(1)}" y2="${PB}" class="bu-today"/>
-      <text x="${tx.toFixed(1)}" y="${PT - 5}" class="bu-today-lbl" text-anchor="middle">Today</text>
-      <polyline points="${donePath}" class="bu-done"/>
-      <circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.6" class="bu-dot"/>
-      <g transform="translate(${tx.toFixed(1)},${cy.toFixed(1)})">
-        <rect x="-23" y="0" width="46" height="17" rx="8.5" class="bu-callout-bg"/>
-        <text x="0" y="12" text-anchor="middle" class="bu-callout-tx">${done}/${scope}</text>
-      </g>
+      <line x1="${X(startMs).toFixed(1)}" y1="${Y(0).toFixed(1)}" x2="${X(endMs).toFixed(1)}" y2="${Y(finalScope).toFixed(1)}" class="bu-ideal"/>
+      <line x1="${X(todayMs).toFixed(1)}" y1="${Y(finalScope).toFixed(1)}" x2="${X(endMs).toFixed(1)}" y2="${Y(finalScope).toFixed(1)}" class="bu-proj"/>
+      <line x1="${X(todayMs).toFixed(1)}" y1="${PT}" x2="${X(todayMs).toFixed(1)}" y2="${PB}" class="bu-today"/>
+      <text x="${tx.toFixed(1)}" y="${PT - 4}" class="bu-today-lbl" text-anchor="middle">Today</text>
+      <path d="${step('scope')}" class="bu-scope-line" fill="none"/>
+      <path d="${step('done')}" class="bu-done-line" fill="none"/>
+      ${dots('scope', 'bu-scope-dot')}${dots('done', 'bu-done-dot')}
     </svg>
     <div class="bu-legend">
-      <span class="bu-leg"><i class="bu-leg-dot"></i>Done</span>
-      <span class="bu-leg"><i class="bu-leg-line scope"></i>Scope</span>
-      <span class="bu-leg"><i class="bu-leg-line ideal"></i>Ideal</span>
+      <span class="bu-leg"><i class="bu-leg-line scope"></i>Work scope</span>
+      <span class="bu-leg"><i class="bu-leg-line proj"></i>Projection</span>
+      <span class="bu-leg"><i class="bu-leg-line done"></i>Completed</span>
+      <span class="bu-leg"><i class="bu-leg-line ideal"></i>Guideline</span>
     </div>
   </div>`
 }
 
 // ── Cycle-time stats (per team) ───────────────────────────────────────────────
-// avg / median / max age of in-flight tickets (days). Real data · no changelog
-// needed. (True per-stage Analysis→Deploy timing still needs Jira history.)
+// Prefer the backend's 90-day flow cycle time (real created→resolved over the
+// window); fall back to in-flight ticket ages if a team has no flowCycle yet.
 function cycleStats(t) {
+  if (t.flowCycle) return t.flowCycle
   const days = (t.inFlightTickets || []).map((k) => Number(k.days) || 0)
   if (!days.length) return null
   const sorted = [...days].sort((a, b) => a - b)
@@ -336,7 +344,7 @@ function cyTiles(c) {
   // blue/purple/orange treatment was noisy and read as unrelated categories.
   return `<div class="cy-tiles">${cyTile(c.avg, 'AVG', 'var(--paper)')}${cyTile(c.median, 'MEDIAN', 'var(--paper)')}${cyTile(c.max, 'MAX', 'var(--paper)')}</div>`
 }
-const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">days in flight</span></div>`
+const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">90-day window</span></div>`
 
 // Full panel for the detail overlay (stats + top-5 longest-running tickets).
 function cyclePanel(t) {
@@ -367,14 +375,15 @@ function teamCard(t, snap) {
   const blockerCount = isInfra ? (snap.infraBlockers?.length || 0) : (t.blockers?.length || 0)
   const badge = blockerCount
   const badgeStyle = ''
-  // Uniform flow-metric set across ALL teams · Cycle time · WIP · Throughput · Blockers.
-  // Cycle time (avg days in flight) is surfaced here instead of a separate strip.
-  const cyc = cycleStats(t)
+  // Uniform flow-metric set across ALL teams. Cycle time is a 90-day rolling
+  // window (flowCycle from the backend); WIP / Throughput / Blockers are scoped
+  // to the team's active sprint. Tuple: [value, label, color, sublabel].
+  const fc = t.flowCycle
   const stats = [
-    [cyc ? `${cyc.avg}d` : '—', 'Cycle time', ''],
-    [t.inFlight, 'WIP', ''],
-    [t.shipped, 'Throughput', ''],
-    [blockerCount, 'Blockers', blockerCount > 0 ? 'var(--ember)' : ''],
+    [fc ? `${fc.avg}d` : '—', 'Cycle time', '', '(90 days)'],
+    [t.inFlight, 'WIP', '', ''],
+    [t.shipped, 'Throughput', '', ''],
+    [blockerCount, 'Blockers', blockerCount > 0 ? 'var(--ember)' : '', ''],
   ]
   return `
   <div class="team-card ${t.health === 'blocked' ? 'blocked-glow' : ''}" data-team="${esc(t.id)}" role="button" tabindex="0">
@@ -386,7 +395,7 @@ function teamCard(t, snap) {
     ${t.activeSprint ? `<div class="tc-sprint t-mono">⬡ ${esc(sprintLabel(t.activeSprint))}</div>` : ''}
     ${stageBar(t)}
     <div class="tc-stats">
-      ${stats.map(([v, l, c]) => `<div class="tc-stat"><div class="tc-val"${c ? ` style="color:${c}"` : ''}>${esc(v)}</div><div class="tc-lbl">${esc(l)}</div></div>`).join('')}
+      ${stats.map(([v, l, c, sub]) => `<div class="tc-stat"><div class="tc-val"${c ? ` style="color:${c}"` : ''}>${esc(v)}</div><div class="tc-lbl">${esc(l)}${sub ? `<span class="tc-sublbl">${esc(sub)}</span>` : ''}</div></div>`).join('')}
     </div>
     ${burnUp(t)}
   </div>`
