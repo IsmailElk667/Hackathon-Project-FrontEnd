@@ -263,7 +263,11 @@ function stageBar(t) {
 function burnUp(t) {
   const sp = t.activeSprint || {}
   const done = t.shipped || 0
-  const scope = Math.max(done, done + (t.inFlight || 0) + (t.stalled || 0), 1)
+  // Scope = completed + in-flight. `stalled` is a SUBSET of inFlight (backend
+  // counts it within active issues), so it must NOT be added again — doing so
+  // double-counted stalled tickets and inflated the denominator. Backlog is
+  // intentionally excluded (a large "not started" backlog isn't sprint scope).
+  const scope = Math.max(done + (t.inFlight || 0), 1)
   const TD = 10                                   // working days in a 2-week sprint
   let frac = 0.6                                  // sprint fraction elapsed (fallback)
   const start = sp.startDate ? new Date(sp.startDate) : null
