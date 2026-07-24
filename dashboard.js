@@ -373,7 +373,7 @@ function cyTiles(c) {
   // blue/purple/orange treatment was noisy and read as unrelated categories.
   return `<div class="cy-tiles">${cyTile(c.avg, 'AVG', 'var(--paper)')}${cyTile(c.median, 'MEDIAN', 'var(--paper)')}${cyTile(c.max, 'MAX', 'var(--paper)')}</div>`
 }
-const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">90-day window</span></div>`
+const cyHead = () => `<div class="cy-head"><span class="cy-title">CYCLE TIME</span><span class="cy-range">this sprint</span></div>`
 
 // Full panel for the detail overlay (stats + top-5 longest-running tickets).
 function cyclePanel(t) {
@@ -404,12 +404,13 @@ function teamCard(t, snap) {
   const blockerCount = isInfra ? (snap.infraBlockers?.length || 0) : (t.blockers?.length || 0)
   const badge = blockerCount
   const badgeStyle = ''
-  // Uniform flow-metric set across ALL teams. Cycle time is a 90-day rolling
-  // window (flowCycle from the backend); WIP / Throughput / Blockers are scoped
-  // to the team's active sprint. Tuple: [value, label, color, sublabel].
+  // Uniform flow-metric set across ALL teams, all scoped to the active sprint.
+  // Cycle time = Actionable-Agile-style median (first in-progress → completion)
+  // from the backend flowCycle. Tuple: [value, label, color, sublabel].
   const fc = t.flowCycle
+  const cycleVal = fc ? (fc.median ?? fc.avg) : null
   const stats = [
-    [fc ? `${fc.avg}d` : '—', 'Cycle time', '', '(90 days)'],
+    [cycleVal != null ? `${cycleVal}d` : '—', 'Cycle time', '', '(this sprint)'],
     [t.inFlight, 'WIP', '', ''],
     [t.shipped, 'Throughput', '', ''],
     [blockerCount, 'Blockers', blockerCount > 0 ? 'var(--ember)' : '', ''],
