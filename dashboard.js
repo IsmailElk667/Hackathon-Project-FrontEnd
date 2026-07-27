@@ -231,8 +231,9 @@ const STAGE_BAR = [
   { key: 'devdone',  label: 'Dev Done', color: '#7DD3FC', re: /(dev done|development done|ready for review|code complete)/ },
   { key: 'review',   label: 'Review',   color: '#F97316', re: /(code review|review|pr |pull request|business review)/ },
   { key: 'qa',       label: 'QA',       color: '#3B82F6', re: /(qa|test|verif)/ },
-  { key: 'deploy',   label: 'Deploy',   color: '#14B8A6', re: /(ready to deploy|ready for release|waiting on release|deploy|approved|staged|ready)/ },
-  { key: 'done',     label: 'Done',     color: '#22C55E', re: /(released|merged|deployed|done|closed|shipped|complete)/ },
+  // Deploy + Done merged into a single "Done" — deploy-stage statuses (ready to
+  // deploy / merged to release / etc.) now count as Done.
+  { key: 'done',     label: 'Done',     color: '#22C55E', re: /(ready to deploy|ready for release|waiting on release|deploy|approved|staged|ready|released|merged|deployed|done|closed|shipped|complete)/ },
 ]
 function stageBucket(raw) {
   const k = String(raw || '').toLowerCase().replace(/^\s*\d+\.\s*/, '').trim()
